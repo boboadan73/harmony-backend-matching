@@ -1,4 +1,17 @@
-/* color palette from <https://github.com/vuejs/theme> */
+/* ==========================================================================
+   base.css
+   Purpose: Global design tokens and base styles for the Harmony frontend.
+   Why: Centralizing colors/spacing/shadows as CSS variables keeps the UI
+        consistent across all views and makes theme updates fast and safe.
+   Notes: Includes a Harmony green theme + fallbacks for dark mode.
+   ========================================================================== */
+/* --------------------------------------------------------------------------
+   Base palette + Harmony theme tokens
+   - We keep a base (Vue-like) palette for compatibility.
+   - We define Harmony brand greens and semantic tokens used across the app.
+   Why: Using variables avoids repeating hex codes and enables consistent UI.
+   -------------------------------------------------------------------------- */
+
 :root {
   --vt-c-white: #ffffff;
   --vt-c-white-soft: #f8f8f8;
@@ -20,6 +33,10 @@
   --vt-c-text-dark-1: var(--vt-c-white);
   --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
 
+  /* Harmony theme tokens:
+   These variables represent the brand identity (greens) and UI decisions
+   (backgrounds/cards/buttons). Views should consume tokens, not raw colors. */
+
   /* =========================
      HARMONY GREEN THEME (GLOBAL)
      ========================= */
@@ -31,7 +48,8 @@
   --h-green-600: #3f7f63;
   --h-green-500: #4a8a6d;
 
-  /* RGB helpers (כדי להשתמש ב-rgba עם var) */
+/* RGB helpers:
+   Used when we need rgba() with variables (e.g., shadows/overlays). */
   --h-green-900-rgb: 31, 63, 50;
   --h-green-800-rgb: 36, 81, 63;
   --h-green-700-rgb: 47, 107, 79;
@@ -44,10 +62,10 @@
   --h-green-soft: #7ab8a0;
   --h-green-very-soft: #e9f3ee;
 
-  /* 🌿 PAGE BACKGROUND – זה מה שהיה לבן */
-  --h-bg-1: #f2f8f5;   /* למעלה */
-  --h-bg-2: #e6f1ec;   /* אמצע */
-  --h-bg-3: #dbece5;   /* למטה */
+  /* 🌿 PAGE BACKGROUND */
+  --h-bg-1: #f2f8f5;   
+  --h-bg-2: #e6f1ec;  
+  --h-bg-3: #dbece5;   
 
   /* TEXT */
   --h-text: #1f3f32;
@@ -76,7 +94,7 @@
 
 
 
-  /* login specific bg (ירוק “Harmony” אבל לא כהה מדי) */
+  /* login specific bg  */
   --h-bg-login-1: #3a765c;
   --h-bg-login-2: #4a8a6d;
   --h-bg-login-3: #6fb095;
@@ -105,20 +123,20 @@
   --h-text: #1f2f27;
   --h-text-muted: rgba(31, 47, 39, 0.72);
 
-  /* buttons (אחיד לכל האפליקציה) */
+  /* buttons  */
   --h-btn-border-width: 2.5px;
   --h-btn-border: var(--h-strong-border);
   --h-btn-border-hover: var(--h-strong-border-hover);
 
-  /* “חיזוק” צבע הכפתורים */
+ 
   --h-btn-primary-bg-1: rgba(233, 243, 238, 0.98);
   --h-btn-primary-bg-2: rgba(206, 232, 221, 0.98);
   --h-btn-secondary-bg: rgba(255, 255, 255, 0.96);
 
   --h-btn-disabled-bg: rgba(233, 243, 238, 0.62);
-  --h-btn-text: #111; /* חשוב: שחור */
+  --h-btn-text: #111; 
 
-  /* overlay למניו שיהיה ברור ולא “שקוף מדי” */
+  
   --h-overlay: rgba(0, 0, 0, 0.62);
 
   /* backward compatibility */
@@ -127,6 +145,10 @@
   --green-soft: var(--h-soft);
   --green-border: var(--h-border);
   --text-dark: var(--h-text);
+
+  /* Global semantic tokens:
+   Higher-level variables used by components/views (cards, overlay, buttons).
+   Why: Separates "design meaning" (card background) from the actual color. */
 
   /* =========================
      GLOBAL TOKENS (used across views)
@@ -151,6 +173,10 @@
   --h-btn-border-hover: var(--h-strong-border-hover);
 
 }
+/* Semantic mapping:
+   Map Harmony tokens to generic names (color-background, color-text, etc.)
+   so components can use semantic names without caring about the theme. */
+
 
 /* semantic color variables for this project */
 :root {
@@ -166,7 +192,9 @@
 
   --section-gap: 160px;
 }
-
+/* Dark mode support:
+   Provides readable defaults if the OS is set to dark theme.
+   (Currently keeps Vue base colors for simplicity.) */
 @media (prefers-color-scheme: dark) {
   :root {
     --color-background: var(--vt-c-black);
@@ -180,6 +208,8 @@
     --color-text: var(--vt-c-text-dark-2);
   }
 }
+/* Basic reset:
+   Ensures consistent sizing and removes default margins across browsers. */
 
 *,
 *::before,
@@ -194,7 +224,10 @@ body {
   margin: 0;
   font-family: Arial, sans-serif;
 
-  /* 🌿 Harmony – ירוק מחוזק אבל רך (גלובלי) */
+  /* App background:
+   Global gradient background applied to the entire app shell.
+   Why: Keeps a consistent "Harmony" look across all pages. */
+
   background: linear-gradient(
     180deg,
     #e6f2ec 0%,
@@ -212,5 +245,3 @@ html, body, #app {
 #app {
   background: transparent !important;
 }
-
-

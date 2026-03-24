@@ -62,6 +62,7 @@
 </template>
 
 <script setup>
+import { API_BASE_URL, buildApiUrl } from '@/services/api'
 import defaultAvatar from '@/assets/default-avatar.png'
 
 import { computed, ref, watch, onMounted } from 'vue'
@@ -124,7 +125,7 @@ const isRtl = computed(() => lang.value === 'ar' || lang.value === 'he')
 
 
 const userPhone = computed(() => authStore?.phone || '')
-const API_BASE = 'http://localhost:8000'
+const API_BASE = API_BASE_URL
 const profileAvatar = ref(defaultAvatar)
 
 function onAvatarError() {
@@ -133,12 +134,7 @@ function onAvatarError() {
 
 function toAbsoluteUrl(url) {
   if (!url) return ''
-  // אם כבר URL מלא
-  if (url.startsWith('http://') || url.startsWith('https://')) return url
-  // אם זה /path יחסי
-  if (url.startsWith('/')) return `${API_BASE}${url}`
-  // אם זה סתם "images/x.png"
-  return `${API_BASE}/${url}`
+  return buildApiUrl(url)
 }
 
 function extractAvatar(data) {
@@ -166,7 +162,7 @@ async function loadProfileAvatar() {
 
   try {
     // ⚠️ שימי לב: זה endpoint שצריך להחזיר נתוני משתמש (כולל תמונה)
-    const res = await fetch(`${API_BASE}/profile/${id}`)
+    const res = await fetch(buildApiUrl(`/profile/${id}`))
     if (!res.ok) throw new Error('profile endpoint failed')
 
     const data = await res.json()

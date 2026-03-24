@@ -1,4 +1,7 @@
 <template>
+  <button @click="logout">
+  {{ TEXTS[lang].logout }}
+</button>
   <header class="topNav" :dir="isRtl ? 'rtl' : 'ltr'">
     <!-- Hamburger -->
     <button class="menuBtn" type="button" @click="open = true" aria-label="Open menu">
@@ -53,6 +56,26 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import logoSrc from '../assets/harmony-logo.png'
 
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+function logout() {
+  localStorage.removeItem('harmony_pid')
+  router.push('/login')
+}
+const TEXTS = {
+  en: {
+    logout: 'Logout'
+  },
+  he: {
+    logout: 'התנתק'
+  },
+  ar: {
+    logout: 'تسجيل الخروج'
+  }
+}
+
 const props = defineProps({
   lang: { type: String, default: 'en' },
 })
@@ -90,6 +113,8 @@ const t = computed(() => {
 
 <style scoped>
 /* NAV */
+
+
 .topNav{
   position: sticky;
   top: 12px;

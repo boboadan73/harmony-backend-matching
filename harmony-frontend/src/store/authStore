@@ -1,7 +1,22 @@
+/**
+ * authStore.js
+ * Purpose: Lightweight global state for authentication-related data.
+ * Why: Provides a simple shared reactive store without using a full state
+ *      management library (e.g., Pinia/Vuex), which would be overkill here.
+ * Scope: Used to track login status and basic user session state.
+ */
+
+// Vue reactive() is used to create a shared, reactive state object
 import { reactive } from 'vue'
 
+// Global authentication store shared across views and components
 export const authStore = reactive({
-  isLoggedIn: false,
-  phone: '',
-  profileUnlocked: false
+  
+  isLoggedIn: false,// Indicates whether the user has successfully logged in
+
+  phone: '',   // Stores the phone number used during login
+
+  profileUnlocked: false    // Controls access to profile-related views after verification
+
 })
+// Note: This store is intentionally minimal and can be extended if needed.

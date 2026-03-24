@@ -39,6 +39,9 @@
         <p v-if="phoneTouched && phone.trim() && !isIdValid" class="errorText">
           {{ t.phoneError }}
         </p>
+        <p class="privacy-note">
+  {{ privacyText[lang] }}
+</p>
 
         <!-- BUTTONS -->
         <div class="btnBar">
@@ -70,6 +73,11 @@ const phoneTouched = ref(false)
 const LANG_KEY = 'harmony_lang'
 const lang = ref(localStorage.getItem(LANG_KEY) || 'en')
 watch(lang, v => localStorage.setItem(LANG_KEY, v), { immediate: true })
+const privacyText = {
+  en: 'By continuing, you agree to the Privacy Policy. Your data will only be used for networking recommendations during the event.',
+  he: 'בהמשך השימוש במערכת, את/ה מסכימ/ה למדיניות הפרטיות. המידע שלך ישמש רק ליצירת התאמות נטוורקינג במהלך האירוע.',
+  ar: 'بالمتابعة، أنت توافق/ين على سياسة الخصوصية. سيتم استخدام بياناتك فقط لتقديم توصيات للتواصل خلال الفعالية.',
+}
 
 const TEXTS = {
   en: {
@@ -88,7 +96,6 @@ const TEXTS = {
     newParticipant: 'مشارك جديد',
   },
   he: {
-    subtitle: 'הקלד/י מזהה משתתף (ID)',
     language: 'שפה',
     phone: 'מספר טלפון',
     phonePlaceholder: '',
@@ -111,6 +118,10 @@ function isValidId(raw) {
   const id = normalizeId(raw)
   // מאפשר גם מספר שמתחיל ב-0 (טלפון)
   return /^\d+$/.test(id)
+}
+function logout() {
+  localStorage.removeItem('harmony_pid')
+  router.push('/login')
 }
 
 
@@ -349,4 +360,11 @@ function newParticipant() {
     border-bottom-right-radius: 18px;
   }
 }
+.privacy-note {
+  margin-top: 14px;
+  font-size: 12px;
+  text-align: center;
+  color: #4b5f52;
+}
+
 </style>

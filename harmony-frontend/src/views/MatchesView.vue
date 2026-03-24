@@ -68,7 +68,9 @@
 
             <div class="cardHeader">
               <div class="info">
-                <div class="name">{{ m.name }}</div>
+                <!-- ✅ שינוי: במקום m.name -->
+                <div class="name">{{ getName(m) }}</div>
+
                 <div class="role">{{ m.role }}</div>
 
                 <div class="matchPercent ltrNum">
@@ -76,12 +78,19 @@
                 </div>
               </div>
 
-<img class="avatar" :src="m.avatar" alt="avatar" loading="lazy" @error="onAvatarError" />
+              <img
+                class="avatar"
+                :src="m.avatar"
+                alt="avatar"
+                loading="lazy"
+                @error="onAvatarError"
+              />
             </div>
 
             <div class="why">
               <strong>{{ t.why }}</strong>
-              {{ m.whyMatched }}
+              <!-- ✅ כבר אצלך: שינוי יחיד בטמפלייט: במקום m.whyMatched -->
+              {{ getWhy(m) }}
             </div>
 
             <div class="status">
@@ -123,7 +132,19 @@ const route = useRoute()
 /* ===== Language ===== */
 const LANG_KEY = 'harmony_lang'
 const lang = ref(localStorage.getItem(LANG_KEY) || 'en')
-watch(lang, v => localStorage.setItem(LANG_KEY, v), { immediate: true })
+watch(
+  lang,
+  (v, prev) => {
+    localStorage.setItem(LANG_KEY, v)
+
+    // ✅ אם השפה השתנתה בפועל — רענני נתונים כדי לקבל reason בשפה החדשה
+    if (v !== prev) {
+      fetchMatches()
+    }
+  },
+  { immediate: true }
+)
+
 
 const TEXTS = {
   en: {
@@ -199,7 +220,6 @@ const matches = ref([])
 import defaultAvatar from '@/assets/default-avatar.png'
 const placeholderAvatar = defaultAvatar
 
-
 function participantId() {
   return String(route.params.id || '').trim()
 }
@@ -234,11 +254,43 @@ function applySavedMetFlags(list) {
   }))
 }
 
-
 function normalizeResponse(data) {
   if (Array.isArray(data)) return data
   if (data && Array.isArray(data.matches)) return data.matches
   return []
+}
+
+/* ✅ חדש: פונקציה שמחזירה reason לפי השפה (נשאר כמו אצלך – גם אם לא בשימוש) */
+function pickReasonByLang(raw) {
+  const ar = raw?.reason ?? ''
+  const en = raw?.reason_en ?? ''
+  const he = raw?.reason_he ?? ''
+
+  if (lang.value === 'en') return en || ar || he || ''
+  if (lang.value === 'he') return he || en || ar || ''
+  return ar || en || he || ''
+}
+
+/* ✅ פונקציה ל-Why בהתאם לשפה */
+function getWhy(m) {
+  if (!m) return ''
+  if (lang.value === 'en') return m.whyMatched_en || m.whyMatched || m.whyMatched_he || ''
+  if (lang.value === 'he') return m.whyMatched_he || m.whyMatched_en || m.whyMatched || ''
+  return m.whyMatched || m.whyMatched_en || m.whyMatched_he || ''
+}
+
+/* ✅ חדש: פונקציה לשם בהתאם לשפה (לפי match_name מה-backend) */
+function getName(m) {
+  if (!m) return ''
+
+  const mn = m.match_name || {}
+  const original = mn.original || m.name || ''
+  const en = mn.en || ''
+  const he = mn.he || ''
+
+  if (lang.value === 'en') return en || original || he || ''
+  if (lang.value === 'he') return he || en || original || ''
+  return original || en || he || ''
 }
 
 function toUiMatch(raw) {
@@ -247,10 +299,20 @@ function toUiMatch(raw) {
 
   return {
     id: raw?.id ?? Math.random().toString(16).slice(2),
+
     name: raw?.name ?? '',
+
+    // ✅ הוספה בלבד: שומר את match_name שמגיע מה-API
+    match_name: raw?.match_name ?? null,
+
     role: '', // לא מגיע מה-API כרגע
     matchPercent,
+
+    // ✅ שמירה של כל השפות ל-why
     whyMatched: raw?.reason ?? '',
+    whyMatched_en: raw?.reason_en ?? '',
+    whyMatched_he: raw?.reason_he ?? '',
+
     avatar: (raw?.imageUrl && String(raw.imageUrl).trim()) ? raw.imageUrl : placeholderAvatar,
 
     saved: false,
@@ -272,7 +334,9 @@ async function fetchMatches() {
     const data = await res.json()
 
     const rawMatches = normalizeResponse(data)
-    matches.value = rawMatches.map(toUiMatch)
+
+    // ✅ אותו דבר שלך, רק הוספתי applySavedMetFlags (היה אצלך אבל לא השתמשת)
+    matches.value = applySavedMetFlags(rawMatches.map(toUiMatch))
   } catch (e) {
     errorMsg.value = e?.message || 'Failed to fetch'
     matches.value = []
@@ -321,7 +385,6 @@ function markMet(m) {
   }
   saveSet(key, setObj)
 }
-
 
 function skip(m) {
   matches.value = matches.value.filter(x => x.id !== m.id)
@@ -403,35 +466,39 @@ function onAvatarError(e) {
     linear-gradient(180deg, rgba(233,243,238,0.35), rgba(233,243,238,0.08));
 }
 
-
-/* ⭐ BEST MATCH – sits on the top border of the whole card */
+/* ⭐ BEST MATCH – fixed top corner, no overlap, no height change */
 .bestBadge{
   position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 8px;          /* בתוך הכרטיס, לא שלילי */
+  right: 12px;       /* פינה ימנית */
+  left: auto;
 
-  padding: 6px 18px;
+  padding: 6px 14px;
   border-radius: 999px;
 
   background: linear-gradient(90deg, #2f6b4f, #4a8a6d);
   color: #ffffff;
 
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.4px;
 
-  border: 3px solid #2f6b4f;
+  border: 1.5px solid #2f6b4f;
   box-shadow: 0 10px 28px rgba(31,63,50,0.28);
 
-  z-index: 3;
+  z-index: 5;
+  white-space: nowrap;   /* מונע שבירת טקסט */
+  max-width: 90%; 
 }
 
-/* ⭐ RTL fix – center BEST MATCH correctly in Arabic/Hebrew */
+
+
+/* ⭐ RTL – move badge to the right side */
 :dir(rtl) .bestBadge{
-  left: 50%;
+  left: 12px;
   right: auto;
-  transform: translateX(-50%);
+  direction: rtl;
+  text-align: center;
 }
 
 

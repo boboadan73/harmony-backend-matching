@@ -9,8 +9,6 @@
       <div class="page">
         <TopNav :lang="lang" :pid="route.params.id" />
 
-
-
         <!-- header + language -->
         <div class="headerRow">
           <div class="titles">
@@ -42,7 +40,7 @@
 
             <div class="cardHeader">
               <div class="info">
-                <div class="name">{{ pick(m.name) }}</div>
+                <div class="name">{{ getName(m) }}</div>
                 <div class="role">{{ pick(m.role) }}</div>
               </div>
 
@@ -51,7 +49,8 @@
 
             <div class="why">
               <strong>{{ t.why }}</strong>
-              {{ pick(m.whyMatched) }}
+              <!-- ✅ תיקון: למה-התאמה לפי שפה (לא pick על שדה בודד) -->
+              {{ getWhy(m) }}
             </div>
 
             <div class="actions">
@@ -78,6 +77,7 @@ const route = useRoute()
 /* ===== Language ===== */
 const LANG_KEY = 'harmony_lang'
 const lang = ref(localStorage.getItem(LANG_KEY) || 'en')
+
 watch(lang, v => localStorage.setItem(LANG_KEY, v), { immediate: true })
 
 const TEXTS = {
@@ -115,6 +115,27 @@ function pick(field) {
   if (typeof field === 'string') return field
   return field[lang.value] || field.en || field.he || field.ar || ''
 }
+function getName(m) {
+  if (!m) return ''
+
+  const mn = m.match_name || {}
+  const original = mn.original || m.name || ''
+  const en = mn.en || ''
+  const he = mn.he || ''
+
+  if (lang.value === 'en') return en || original || he || ''
+  if (lang.value === 'he') return he || en || original || ''
+  return original || en || he || ''
+}
+
+
+/* ✅ חדש: מחזיר סיבת התאמה לפי שפה (כמו ב-Matches) */
+function getWhy(m) {
+  if (!m) return ''
+  if (lang.value === 'en') return m.whyMatched_en || m.whyMatched || m.whyMatched_he || ''
+  if (lang.value === 'he') return m.whyMatched_he || m.whyMatched_en || m.whyMatched || ''
+  return m.whyMatched || m.whyMatched_en || m.whyMatched_he || ''
+}
 
 /* ===== Per participant keys ===== */
 function participantId() {
@@ -137,7 +158,6 @@ function loadMetIds() {
 const allMetMatches = ref([])
 import defaultAvatar from '@/assets/default-avatar.png'
 const placeholderAvatar = defaultAvatar
-
 
 function normalizeResponse(data) {
   if (Array.isArray(data)) return data
@@ -164,8 +184,15 @@ async function fetchMetMatches() {
       .map(r => ({
         id: r?.id,
         name: r?.name ?? '',
+        match_name: r?.match_name ?? null,
+
         role: r?.role ?? '',
+
+        // ✅ תיקון חשוב: לשמור את כל השפות
         whyMatched: r?.reason ?? '',
+        whyMatched_en: r?.reason_en ?? '',
+        whyMatched_he: r?.reason_he ?? '',
+
         avatar: r?.imageUrl || placeholderAvatar,
       }))
       .filter(m => metIds.has(String(m.id)))
@@ -179,6 +206,9 @@ onMounted(fetchMetMatches)
 // אם עוברים למשתמש אחר (route param משתנה) – טוענים מחדש
 watch(() => route.params.id, () => fetchMetMatches())
 
+// ✅ חשוב: כשמחליפים שפה – טוענים מחדש כדי לקבל reason בשפה הנכונה (אם השרת מחזיר לפי שפה)
+watch(lang, () => fetchMetMatches())
+
 const metMatches = computed(() => allMetMatches.value)
 
 function unmarkMet(m) {
@@ -190,7 +220,6 @@ function unmarkMet(m) {
   allMetMatches.value = allMetMatches.value.filter(x => String(x.id) !== String(m.id))
 }
 </script>
-
 
 <style scoped>
 .container { width: 100%; padding: 0; margin: 0; }
@@ -212,7 +241,6 @@ function unmarkMet(m) {
   position: relative;
   overflow: hidden;
 }
-
 
 /* blobs (צבעים בלבד) */
 .blob { position:absolute; filter: blur(18px); opacity:.55; border-radius:999px; pointer-events:none; }
@@ -327,7 +355,6 @@ function unmarkMet(m) {
   border-color: #24513f;
   background: rgba(233, 243, 238, 1);
 }
-
 
 .empty{
   display:flex; gap:14px; align-items:center;

@@ -7,8 +7,14 @@ import MetView from '../views/MetView.vue'
 import ProfileView from '../views/ProfileView.vue'
 
 const withPidOrLogin = (base) => {
-  const pid = localStorage.getItem('harmony_pid')
-  return pid ? `/${base}/${pid}` : '/login'
+  const pid = String(localStorage.getItem('harmony_pid') || '').trim()
+
+  const hasValidPid =
+    pid !== '' &&
+    pid !== 'null' &&
+    pid !== 'undefined'
+
+  return hasValidPid ? `/${base}/${pid}` : '/login'
 }
 
 const router = createRouter({
@@ -29,6 +35,24 @@ const router = createRouter({
     { path: '/met/:id', component: MetView },
     { path: '/profile/:id', component: ProfileView },
   ],
+})
+router.beforeEach((to, from, next) => {
+  const rawPid = localStorage.getItem('harmony_pid')
+  const pid = String(rawPid || '').trim()
+
+  const hasValidPid =
+    pid !== '' &&
+    pid !== 'null' &&
+    pid !== 'undefined'
+
+  const publicPages = ['/login']
+  const isPublicPage = publicPages.includes(to.path)
+
+  if (!isPublicPage && !hasValidPid) {
+    return next('/login')
+  }
+
+  next()
 })
 
 export default router
