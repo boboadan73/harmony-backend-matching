@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 const fs = require('fs');
 const csv = require('csv-parser'); // read CSV files row by row
@@ -6,6 +7,11 @@ const axios = require('axios'); // used to send HTTP requests to FastAPI
 require("dotenv").config();
 console.log("✅ INDEX SAVED CHECK 123");
 
+app.use(cors({
+  origin: ['https://harmony-frontend-iota.vercel.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+}));
 
 console.log("GROQ_API_KEY =", process.env.GROQ_API_KEY);
 console.log("RUNNING THIS INDEX:new");
@@ -23,15 +29,15 @@ function loadImagesFromParticipantsCsv() {
       .pipe(csv())
       .on('data', (row) => {
         if (index === 0) {
-  console.log('CSV columns:', Object.keys(row));
-}
+          console.log('CSV columns:', Object.keys(row));
+        }
 
         // same row-based id logic used in /api/participants
         const id = String(index++).trim();
 
         // ⚠️ Update column name if needed
         const imageUrl = String(
-            row[''] ||                
+          row[''] ||
           row['imageUrl'] ||
           row['image_url'] ||
           row['image'] ||
@@ -274,10 +280,10 @@ app.get('/api/match/:id', async (req, res) => {
 
     const matches = await getTopMatches(targetId, 5);
     console.log(
-  'Image for first match:',
-  matches[0]?.id,
-  imagesById.get(String(matches[0]?.id))
-);
+      'Image for first match:',
+      matches[0]?.id,
+      imagesById.get(String(matches[0]?.id))
+    );
 
     const explainedMatches = await Promise.all(
       matches.map(async (m) => {
@@ -298,7 +304,7 @@ app.get('/api/match/:id', async (req, res) => {
       'RETURNING:',
       JSON.stringify(explainedMatches[0], null, 2)
     );
-console.log('First explained match:', explainedMatches[0]);
+    console.log('First explained match:', explainedMatches[0]);
 
     res.json(explainedMatches);
   } catch (err) {
