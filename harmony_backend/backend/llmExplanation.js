@@ -444,12 +444,18 @@ ${bVal}
     fieldScores,
     rankedFields: ranked,
     reasons,
+
     explanation: {
       ar: llmExplanation,
       en: llmExplanation_en,
       he: llmExplanation_he
     },
-    // NEW: translated match name returned separately
+
+    reason: llmExplanation,
+    reason_ar: llmExplanation,
+    reason_en: llmExplanation_en,
+    reason_he: llmExplanation_he,
+
     match_name: {
       original: rawMatchName || null,
       en: match_name_en,
