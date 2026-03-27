@@ -62,7 +62,7 @@ function loadImagesFromParticipantsCsv() {
 
 async function getEmbeddings(texts) {
   const response = await axios.post(
-    'http://localhost:8000/embed',
+    'https://harmony-ml.onrender.com/embed',
     { texts }
   );
   return response.data.embeddings;
