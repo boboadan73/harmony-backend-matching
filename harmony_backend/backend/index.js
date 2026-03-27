@@ -289,15 +289,15 @@ app.get('/api/match/:id', async (req, res) => {
 
         // ✅ FIX: normalize name (string / object)
         const rawName = m.name || '';
-
+        const translatedName = exp.match_name || {};
         return {
           id: m.id,
 
           // ---------- NAME ----------
-          name: typeof rawName === 'string' ? rawName : '',
-          name_ar: typeof rawName === 'object' ? rawName.ar || '' : '',
-          name_en: typeof rawName === 'object' ? rawName.en || '' : '',
-          name_he: typeof rawName === 'object' ? rawName.he || '' : '',
+         name: rawName,
+         name_ar: translatedName.original || rawName || '',
+         name_en: translatedName.en || rawName || '',
+         name_he: translatedName.he || rawName || '',,
 
           // ---------- MATCH DATA ----------
           score: m.score,
