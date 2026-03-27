@@ -279,47 +279,41 @@ app.get('/api/match/:id', async (req, res) => {
     console.log('Requested match for ID:', targetId);
 
     const matches = await getTopMatches(targetId, 5);
-    console.log(
-      'Image for first match:',
-      matches[0]?.id,
-      imagesById.get(String(matches[0]?.id))
-    );
 
     const explainedMatches = await Promise.all(
       matches.map(async (m) => {
-  const exp = await explainPair(targetId, m.id);
-  const explanation = exp?.llmExplanation || exp?.explanation || exp || '';
-  const rawName = m.name || '';
+        const exp = await explainPair(targetId, m.id);
 
-  return {
-    id: m.id,
+        // ✅ FIX: normalize explanation (string / object)
+        const explanation = exp?.llmExplanation || exp?.explanation || exp || '';
 
-    name: typeof rawName === 'string' ? rawName : '',
-    name_ar: typeof rawName === 'object' ? rawName.ar || '' : '',
-    name_en: typeof rawName === 'object' ? rawName.en || '' : '',
-    name_he: typeof rawName === 'object' ? rawName.he || '' : '',
+        // ✅ FIX: normalize name (string / object)
+        const rawName = m.name || '';
 
-    score: m.score,
-    breakdown: m.breakdown,
+        return {
+          id: m.id,
 
-    reason: typeof explanation === 'string' ? explanation : '',
-    reason_ar: typeof explanation === 'object' ? explanation.ar || '' : '',
-    reason_en: typeof explanation === 'object' ? explanation.en || '' : '',
-    reason_he: typeof explanation === 'object' ? explanation.he || '' : '',
+          // ---------- NAME ----------
+          name: typeof rawName === 'string' ? rawName : '',
+          name_ar: typeof rawName === 'object' ? rawName.ar || '' : '',
+          name_en: typeof rawName === 'object' ? rawName.en || '' : '',
+          name_he: typeof rawName === 'object' ? rawName.he || '' : '',
 
-    imageUrl: imagesById.get(String(m.id)) || null
-  };
-})
+          // ---------- MATCH DATA ----------
+          score: m.score,
+          breakdown: m.breakdown,
+
+          // ---------- WHY MATCH ----------
+          reason: typeof explanation === 'string' ? explanation : '',
+          reason_ar: typeof explanation === 'object' ? explanation.ar || '' : '',
+          reason_en: typeof explanation === 'object' ? explanation.en || '' : '',
+          reason_he: typeof explanation === 'object' ? explanation.he || '' : '',
+
+          // ---------- IMAGE ----------
           imageUrl: imagesById.get(String(m.id)) || null
         };
       })
     );
-
-    console.log(
-      'RETURNING:',
-      JSON.stringify(explainedMatches[0], null, 2)
-    );
-    console.log('First explained match:', explainedMatches[0]);
 
     res.json(explainedMatches);
   } catch (err) {
