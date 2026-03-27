@@ -294,7 +294,7 @@ app.get('/api/match/:id', async (req, res) => {
           name: m.name,
           score: m.score,
           breakdown: m.breakdown,
-          reason: exp.llmExplanation,
+          reason: exp?.llmExplanation || exp?.explanation || exp || '',
           imageUrl: imagesById.get(String(m.id)) || null
         };
       })
