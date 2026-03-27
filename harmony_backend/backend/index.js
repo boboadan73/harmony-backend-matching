@@ -294,7 +294,19 @@ app.get('/api/match/:id', async (req, res) => {
           name: m.name,
           score: m.score,
           breakdown: m.breakdown,
-          reason: exp?.llmExplanation || exp?.explanation || exp || '',
+          const explanation = exp?.llmExplanation || exp?.explanation || exp || '';
+
+return {
+  id: m.id,
+  name: m.name,
+  score: m.score,
+  breakdown: m.breakdown,
+  reason: typeof explanation === 'string' ? explanation : '',
+  reason_ar: typeof explanation === 'object' ? explanation.ar || '' : '',
+  reason_en: typeof explanation === 'object' ? explanation.en || '' : '',
+  reason_he: typeof explanation === 'object' ? explanation.he || '' : '',
+  imageUrl: imagesById.get(String(m.id)) || null
+};                                        
           imageUrl: imagesById.get(String(m.id)) || null
         };
       })
