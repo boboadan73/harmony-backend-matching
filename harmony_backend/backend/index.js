@@ -265,59 +265,56 @@ app.get('/api/participants', async (req, res) => {
 });
 
 const { explainPair } = require('./llmExplanation');
-const { getTopMatches } = require('./similarity');
-
-// Returns top-K most similar participants (NO explanation)
 const { getTopMatchesForExternalTarget } = require('./similarity');
-
+// Returns top-K most similar participants (NO explanation)
 app.get('/api/match/:pid', async (req, res) => {
   try {
-    const pid = req.params.pid;
+    const pid = String(req.params.pid).trim();
 
-    // 1. להביא מה-system backend (Cosmos)
-    const userRes = await fetch(`https://harmony-system-backend.onrender.com/api/participants/${pid}`);
-    const userData = await userRes.json();
+    if (!pid) {
+      return res.status(400).json({ error: 'Invalid participant ID' });
+    }
 
-    const participant = userData.participant;
+    const userRes = await axios.get(
+      `https://harmony-system-backend-1.onrender.com/api/participants/${pid}`
+    );
+
+    const participant = userRes.data?.participant || userRes.data;
 
     if (!participant) {
       return res.status(404).json({ error: 'User not found in system backend' });
     }
 
-    // 2. ליצור embeddings דרך ML service
     const texts = [
       participant.job || '',
       participant.academic || '',
       participant.professional || '',
       participant.personal || '',
-      `${participant.job} ${participant.academic} ${participant.professional} ${participant.personal}`
+      `${participant.job || ''} ${participant.academic || ''} ${participant.professional || ''} ${participant.personal || ''}`
     ];
 
-    const embedRes = await fetch('https://harmony-ml.onrender.com/embed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ texts })
-    });
+    const embedRes = await axios.post(
+      'http://localhost:8000/embed',
+      { texts }
+    );
 
-    const embedData = await embedRes.json();
+    const embeddings = embedRes.data?.embeddings || [];
 
     const target = {
-      id: participant.id,
-      name: participant.name,
-      jobEmb: embedData.embeddings[0],
-      acadEmb: embedData.embeddings[1],
-      profEmb: embedData.embeddings[2],
-      persEmb: embedData.embeddings[3],
-      globEmb: embedData.embeddings[4],
+      id: String(participant.id),
+      name: participant.name || '',
+      jobEmb: embeddings[0] || [],
+      acadEmb: embeddings[1] || [],
+      profEmb: embeddings[2] || [],
+      persEmb: embeddings[3] || [],
+      globEmb: embeddings[4] || []
     };
 
-    // 3. חישוב התאמות (בלי CSV target!)
     const matches = await getTopMatchesForExternalTarget(target, 5);
 
-    res.json({ matches });
-
+    res.json(matches);
   } catch (err) {
-    console.error(err);
+    console.error('Match error:', err);
     res.status(500).json({ error: err.message });
   }
 });
