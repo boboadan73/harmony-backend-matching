@@ -123,6 +123,74 @@ function getTopMatches(targetId, k = 5) {
       .on('error', reject); // Handle file or parsing errors
   });
 }
+function loadParticipantsFromEmbeddingsCsv() {
+  return new Promise((resolve, reject) => {
+    const participants = [];
+
+    fs.createReadStream('data/field_embeddings.csv')
+      .pipe(csv())
+      .on('data', (row) => {
+        participants.push({
+          id: String(row.id),
+          name: row.name,
+          jobEmb: safeParseEmbedding(row.jobTitle_embedding),
+          acadEmb: safeParseEmbedding(row.academic_embedding),
+          profEmb: safeParseEmbedding(row.professional_embedding),
+          persEmb: safeParseEmbedding(row.personal_embedding),
+          globEmb: safeParseEmbedding(row.profile_embedding)
+        });
+      })
+      .on('end', () => resolve(participants))
+      .on('error', reject);
+  });
+}
+
+function scoreAgainstParticipants(target, participants, k = 5) {
+  const results = participants
+    .filter(p => String(p.id) !== String(target.id))
+    .map(p => {
+      const sGlobal = cosineSimilarity(target.globEmb, p.globEmb);
+      const sJob  = cosineSimilarity(target.jobEmb,  p.jobEmb);
+      const sProf = cosineSimilarity(target.profEmb, p.profEmb);
+      const sAcad = cosineSimilarity(target.acadEmb, p.acadEmb);
+      const sPers = cosineSimilarity(target.persEmb, p.persEmb);
+
+      const sFields =
+        WEIGHTS.job          * sJob  +
+        WEIGHTS.professional * sProf +
+        WEIGHTS.academic     * sAcad +
+        WEIGHTS.personal     * sPers;
+
+      const score = sFields;
+
+      return {
+        id: p.id,
+        name: p.name,
+        score,
+        breakdown: {
+          global: sGlobal,
+          fields: {
+            job: sJob,
+            professional: sProf,
+            academic: sAcad,
+            personal: sPers
+          }
+        }
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k);
+
+  return results;
+}
+
+async function getTopMatchesForExternalTarget(target, k = 5) {
+  const participants = await loadParticipantsFromEmbeddingsCsv();
+  return scoreAgainstParticipants(target, participants, k);
+}
 
 // Export matching function for use in API routes
-module.exports = { getTopMatches };
+module.exports = {
+  getTopMatches,
+  getTopMatchesForExternalTarget
+};

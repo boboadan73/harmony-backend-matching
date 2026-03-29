@@ -269,7 +269,7 @@ const { getTopMatches } = require('./similarity');
 
 // Returns top-K most similar participants (NO explanation)
 app.get('/api/match/:id', async (req, res) => {
-  const targetId = Number(req.params.id);
+  const targetId = String(req.params.id);
 
   if (Number.isNaN(targetId)) {
     return res.status(400).json({ error: 'Invalid participant ID' });
