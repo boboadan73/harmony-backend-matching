@@ -268,7 +268,6 @@ app.get('/api/participants', async (req, res) => {
 const { explainPair } = require('./llmExplanation');
 const { getTopMatchesForExternalTarget } = require('./similarity');
 // Returns top-K most similar participants (NO explanation)
-const { getTopMatchesForExternalTarget } = require('./similarity');
 
 app.get('/api/match/:pid', async (req, res) => {
   try {
