@@ -12,49 +12,7 @@ const app = express();
 const { explainPair } = require('./llmExplanation');
 const { getTopMatches } = require('./similarity');
 
-// Returns top-K most similar participants (NO explanation)
-app.get('/api/match/:id', async (req, res) => {
-  const targetId = Number(req.params.id);
 
-  if (Number.isNaN(targetId)) {
-    return res.status(400).json({ error: 'Invalid participant ID' });
-  }
-
-  try {
-    console.log('Requested match for ID:', targetId);
-
-    const matches = await getTopMatches(targetId, 5);
-   ;
-
-    const explainedMatches = await Promise.all(
-      matches.map(async (m) => {
-        const exp = await explainPair(targetId, m.id);
-
-                return {
-          id: m.id,
-          name: m.name,
-          score: m.score,
-          breakdown: m.breakdown,
-
-          reason: exp.explanation?.ar || null,
-          reason_en: exp.explanation?.en || null,
-          reason_he: exp.explanation?.he || null,
-
-          // 🔹 חדש – שם מתורגם בנפרד
-          match_name: exp.match_name || null,
-
-
-imageUrl: null        };
-
-      })
-    );
-
-    res.json(explainedMatches);
-  } catch (err) {
-    console.error('Match error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 /* ---------- START SERVER ---------- */
 
@@ -254,6 +212,3 @@ app.get('/api/match/:id', async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
-});
