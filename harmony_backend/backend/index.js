@@ -62,11 +62,7 @@ function loadImagesFromParticipantsCsv() {
 /* ---------- EMBEDDING CLIENT ---------- */
 
 async function getEmbeddings(texts) {
-  const response = await axios.post(
-    'http://localhost:8000/embed',
-    { texts }
-  );
-  return response.data.embeddings;
+  return texts.map(() => []);
 }
 
 async function getEmbeddingsBatched(texts, batchSize = 50) {
@@ -297,9 +293,7 @@ const userRes = await axios.get(
       `${participant.job || ''} ${participant.academic || ''} ${participant.professional || ''} ${participant.personal || ''}`
     ];
 
-    const embedRes = await axios.post('http://localhost:8000/embed', { texts });
-    const embeddings = embedRes.data?.embeddings || [];
-
+   const embeddings = [[], [], [], [], []];
     const target = {
       id: String(participant.id),
       name: participant.name || '',
