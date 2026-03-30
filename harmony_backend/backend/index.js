@@ -62,7 +62,6 @@ function loadImagesFromParticipantsCsv() {
   return new Promise((resolve, reject) => {
     let index = 0;
 
-const path = require('path');
 
 fs.createReadStream(path.join(__dirname, 'data', 'participants.csv'))      .pipe(csv())
       .on('data', (row) => {
