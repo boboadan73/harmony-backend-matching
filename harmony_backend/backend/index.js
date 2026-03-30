@@ -6,6 +6,7 @@ const csv = require('csv-parser'); // read CSV files row by row
 const axios = require('axios'); // used to send HTTP requests to FastAPI
 require("dotenv").config();
 console.log("✅ INDEX SAVED CHECK 123");
+const path = require('path');
 
 app.use(cors({
   origin: ['https://harmony-frontend-iota.vercel.app'],
@@ -25,8 +26,9 @@ function loadImagesFromParticipantsCsv() {
   return new Promise((resolve, reject) => {
     let index = 0;
 
-    fs.createReadStream('data/participants.csv', { encoding: 'utf8' })
-      .pipe(csv())
+const path = require('path');
+
+fs.createReadStream(path.join(__dirname, 'data', 'participants.csv'))      .pipe(csv())
       .on('data', (row) => {
         if (index === 0) {
           console.log('CSV columns:', Object.keys(row));
