@@ -1,6 +1,14 @@
-const express = require('express');
-const app = express();
+require("dotenv").config();
 
+const express = require("express");
+const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
+const csv = require("csv-parser");
+const axios = require("axios");
+const { CosmosClient } = require("@azure/cosmos");
+
+const app = express();
 const { explainPair } = require('./llmExplanation');
 const { getTopMatches } = require('./similarity');
 
@@ -54,9 +62,6 @@ app.get('/api/match/:id', async (req, res) => {
 });
 
 /* ---------- START SERVER ---------- */
-loadImagesFromParticipantsCsv().catch(err => {
-  console.error('❌ Failed to load images from participants.csv:', err);
-});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
