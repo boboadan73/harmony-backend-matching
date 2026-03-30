@@ -24,11 +24,7 @@ app.get('/api/match/:id', async (req, res) => {
     console.log('Requested match for ID:', targetId);
 
     const matches = await getTopMatches(targetId, 5);
-    console.log(
-  'Image for first match:',
-  matches[0]?.id,
-  imagesById.get(String(matches[0]?.id))
-);
+   ;
 
     const explainedMatches = await Promise.all(
       matches.map(async (m) => {
@@ -48,8 +44,7 @@ app.get('/api/match/:id', async (req, res) => {
           match_name: exp.match_name || null,
 
 
-          imageUrl: imagesById.get(String(m.id)) || null
-        };
+imageUrl: null        };
 
       })
     );
