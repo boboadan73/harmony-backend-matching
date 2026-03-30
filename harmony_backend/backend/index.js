@@ -27,7 +27,6 @@ console.log("GROQ_API_KEY =", process.env.GROQ_API_KEY);
 
 require("dotenv").config();
 
-const express = require("express");
 const cors = require("cors");
 const { database, container } = require("./config/db");
 
@@ -35,7 +34,6 @@ const authRoutes = require("./routes/auth.routes");
 const participantRoutes = require("./routes/participants.routes");
 
 const express = require('express');
-const cors = require('cors');
 const app = express();
 const fs = require('fs');
 const csv = require('csv-parser'); // read CSV files row by row
