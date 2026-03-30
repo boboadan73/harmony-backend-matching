@@ -223,7 +223,6 @@ app.get('/api/participants', async (req, res) => {
 });
 
 //const { explainPair } = require('./llmExplanation');
-const { getTopMatches } = require('./similarity');
 
 app.get('/api/match/:id', async (req, res) => {
   const targetId = Number(req.params.id);
