@@ -1,5 +1,5 @@
 const express = require('express');
-console.log("MATCH BACKEND NEW VERSION");
+
 const cors = require('cors');
 const app = express();
 const fs = require('fs');
@@ -62,7 +62,11 @@ function loadImagesFromParticipantsCsv() {
 /* ---------- EMBEDDING CLIENT ---------- */
 
 async function getEmbeddings(texts) {
-  return texts.map(() => []);
+  const response = await axios.post(
+    'http://localhost:8000/embed',
+    { texts }
+  );
+  return response.data.embeddings;
 }
 
 async function getEmbeddingsBatched(texts, batchSize = 50) {
@@ -264,6 +268,7 @@ app.get('/api/participants', async (req, res) => {
 const { explainPair } = require('./llmExplanation');
 const { getTopMatchesForExternalTarget } = require('./similarity');
 // Returns top-K most similar participants (NO explanation)
+const { getTopMatchesForExternalTarget } = require('./similarity');
 
 app.get('/api/match/:pid', async (req, res) => {
   try {
@@ -273,11 +278,9 @@ app.get('/api/match/:pid', async (req, res) => {
       return res.status(400).json({ error: 'Invalid participant ID' });
     }
 
-    const fixedPid = pid.startsWith('p') ? pid : `p${pid}`;
-
-const userRes = await axios.get(
-  `https://harmony-system-backend.onrender.com/api/participants/${fixedPid}`
-);
+    const userRes = await axios.get(
+      `https://harmony-system-backend-1.onrender.com/api/participants/${pid}`
+    );
 
     const participant = userRes.data?.participant || userRes.data;
 
@@ -293,7 +296,9 @@ const userRes = await axios.get(
       `${participant.job || ''} ${participant.academic || ''} ${participant.professional || ''} ${participant.personal || ''}`
     ];
 
-   const embeddings = [[], [], [], [], []];
+    const embedRes = await axios.post('http://localhost:8000/embed', { texts });
+    const embeddings = embedRes.data?.embeddings || [];
+
     const target = {
       id: String(participant.id),
       name: participant.name || '',
