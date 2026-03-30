@@ -54,7 +54,8 @@ function getTopMatches(targetId, k = 5) {
     const participants = [];
 
     // Read precomputed field-level embeddings from CSV
-    fs.createReadStream('data/field_embeddings.csv')
+const path = require('path')
+fs.createReadStream(path.join(__dirname, 'data', 'field_embeddings.csv'))
       .pipe(csv())
       .on('data', (row) => {
         // Load embeddings for each participant by field
