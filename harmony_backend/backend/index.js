@@ -1,4 +1,5 @@
-
+const express = require('express');
+const app = express();
 
 const { explainPair } = require('./llmExplanation');
 const { getTopMatches } = require('./similarity');
