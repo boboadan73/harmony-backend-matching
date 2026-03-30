@@ -11,9 +11,7 @@ const container = database.container("participants");
 const express = require('express');
 
 const fs = require('fs');
-const csv = require('csv-parser'); // read CSV files row by row
 const axios = require('axios'); // used to send HTTP requests to FastAPI
-require("dotenv").config();
 
 
 
@@ -33,11 +31,8 @@ const { database, container } = require("./config/db");
 const authRoutes = require("./routes/auth.routes");
 const participantRoutes = require("./routes/participants.routes");
 
-const express = require('express');
 const app = express();
-const fs = require('fs');
 const csv = require('csv-parser'); // read CSV files row by row
-const axios = require('axios'); // used to send HTTP requests to FastAPI
 require("dotenv").config();
 console.log("✅ INDEX SAVED CHECK 123");
 const path = require('path');
