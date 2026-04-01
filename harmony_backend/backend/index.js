@@ -25,7 +25,6 @@ app.use(cors({
 
 }));
 
-app.options('*', cors());
 console.log("✅ Server starting...");
 
 // =====================================
