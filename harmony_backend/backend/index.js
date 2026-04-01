@@ -81,7 +81,7 @@ fs.createReadStream(path.join(__dirname, 'data', 'participants.csv'))      .pipe
         if (imageUrl) imagesById.set(id, imageUrl);
       })
       .on('end', () => {
-        console.log(✅ Loaded ${imagesById.size} participant images);
+        console.log('✅ Loaded ${imagesById.size} participant images');
         resolve();
       })
       .on('error', reject);
@@ -103,7 +103,7 @@ async function getEmbeddingsBatched(texts, batchSize = 50) {
 
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
-    console.log(Embedding batch ${i}–${i + batch.length});
+    console.log('Embedding batch ${i}–${i + batch.length}');
 
     const emb = await getEmbeddings(batch);
     all.push(...emb);
@@ -166,7 +166,7 @@ function saveCleanParticipantsCSV(participants) { // Export cleaned text for QA/
     const pr = String(p.professionalText || '').replace(/"/g, '""');
     const pe = String(p.personalText || '').replace(/"/g, '""');
 
-    return ${p.id},"${safeName}","${jt}","${ac}","${pr}","${pe}";
+    return '${p.id},"${safeName}","${jt}","${ac}","${pr}","${pe}"';
   });
 
   fs.writeFileSync('data/participants_clean.csv', header + lines.join('\n'), 'utf8');
@@ -184,7 +184,7 @@ function saveFieldEmbeddingsToCSV(participants) {
     const pe = JSON.stringify(p.personal_embedding || []).replace(/"/g, '""');
     const glob = JSON.stringify(p.profile_embedding || []).replace(/"/g, '""');
 
-    return ${p.id},"${safeName}","${jt}","${ac}","${pr}","${pe}","${glob}";
+    return '${p.id},"${safeName}","${jt}","${ac}","${pr}","${pe}","${glob}";'
   });
 
   const content = header + rows.join('\n');
@@ -343,7 +343,7 @@ loadImagesFromParticipantsCsv().catch(err => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(Server running on port ${PORT});
+  console.log('Server running on port ${PORT}');
 });
 
 
@@ -362,7 +362,7 @@ async function getEmbeddingsBatched(texts, batchSize = 50) {
 
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
-    console.log(Embedding batch ${i}–${i + batch.length});
+    console.log('Embedding batch ${i}–${i + batch.length}');
 
     const emb = await getEmbeddings(batch);
     all.push(...emb);
@@ -422,7 +422,7 @@ function saveCleanParticipantsCSV(participants) {
   const header = 'id,name,jobTitle_clean,academic_clean,professional_clean,personal_clean\n';
 
   const rows = participants.map(p =>
-    ${p.id},"${p.name}","${p.jobTitleText}","${p.academicText}","${p.professionalText}","${p.personalText}"
+    '${p.id},"${p.name}","${p.jobTitleText}","${p.academicText}","${p.professionalText}","${p.personalText}"'
   );
 
   fs.writeFileSync('data/participants_clean.csv', header + rows.join('\n'), 'utf8');
@@ -433,7 +433,7 @@ function saveFieldEmbeddingsToCSV(participants) {
   const header = 'id,name,jobTitle_embedding,academic_embedding,professional_embedding,personal_embedding,profile_embedding\n';
 
   const rows = participants.map(p =>
-    ${p.id},"${p.name}","${JSON.stringify(p.jobTitle_embedding)}","${JSON.stringify(p.academic_embedding)}","${JSON.stringify(p.professional_embedding)}","${JSON.stringify(p.personal_embedding)}","${JSON.stringify(p.profile_embedding)}"
+    '${p.id},"${p.name}","${JSON.stringify(p.jobTitle_embedding)}","${JSON.stringify(p.academic_embedding)}","${JSON.stringify(p.professional_embedding)}","${JSON.stringify(p.personal_embedding)}","${JSON.stringify(p.profile_embedding)}"'
   );
 
   fs.writeFileSync('data/field_embeddings.csv', header + rows.join('\n'), 'utf8');
