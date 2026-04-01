@@ -1,543 +1,454 @@
+require("dotenv").config();
+
 const { CosmosClient } = require("@azure/cosmos");
+const express = require("express");
+const cors = require("cors");
+const axios = require("axios");
 
+const app = express();
 
-const key = process.env.COSMOS_KEY; //from cosmos
-const endpoint = process.env.COSMOS_ENDPOINT;
+// ===== COSMOS =====
+const client = new CosmosClient({
+  endpoint: process.env.COSMOS_ENDPOINT,
+  key: process.env.COSMOS_KEY,
+});
 
-const client = new CosmosClient({ endpoint, key });
 const database = client.database("harmony-db");
 const container = database.container("participants");
 
-const express = require('express');
-
-const fs = require('fs');
-const axios = require('axios'); // used to send HTTP requests to FastAPI
-
-
-
-console.log("GROQ_API_KEY =", process.env.GROQ_API_KEY);
-
-
-/* =========================================================
-   LOAD PARTICIPANT IMAGES FROM CSV (ONCE)
-   ========================================================= */
-
-
-require("dotenv").config();
-
-const cors = require("cors");
-const { database, container } = require("./config/db");
-
-const authRoutes = require("./routes/auth.routes");
-const participantRoutes = require("./routes/participants.routes");
-
-const app = express();
-const csv = require('csv-parser'); // read CSV files row by row
-require("dotenv").config();
-console.log("✅ INDEX SAVED CHECK 123");
-const path = require('path');
-
+// ===== MIDDLEWARE =====
 app.use(cors({
   origin: ['https://harmony-frontend-iota.vercel.app'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
 }));
 
-console.log("GROQ_API_KEY =", process.env.GROQ_API_KEY);
-console.log("RUNNING THIS INDEX:new");
+console.log("✅ Server starting...");
 
-/* =========================================================
-   LOAD PARTICIPANT IMAGES FROM CSV (ONCE)
-   ========================================================= */
-const imagesById = new Map();
-
-function loadImagesFromParticipantsCsv() {
-  return new Promise((resolve, reject) => {
-    let index = 0;
-
-
-fs.createReadStream(path.join(__dirname, 'data', 'participants.csv'))      .pipe(csv())
-      .on('data', (row) => {
-        if (index === 0) {
-          console.log('CSV columns:', Object.keys(row));
-        }
-
-        // same row-based id logic used in /api/participants
-        const id = String(index++).trim();
-
-        // ⚠️ Update column name if needed
-        const imageUrl = String(
-          row[''] ||
-          row['imageUrl'] ||
-          row['image_url'] ||
-          row['image'] ||
-          row['photo'] ||
-          row['avatar'] ||
-          row['תמונה'] ||
-          row['קישור לתמונה'] ||
-          ''
-        ).trim();
-
-        if (imageUrl) imagesById.set(id, imageUrl);
-      })
-      .on('end', () => {
-        console.log(✅ Loaded ${imagesById.size} participant images);
-        resolve();
-      })
-      .on('error', reject);
-  });
-}
-
-/* ---------- EMBEDDING CLIENT ---------- */
-
-async function getEmbeddings(texts) {
-  const response = await axios.post(
-    'https://harmony-ml.onrender.com/embed',
-    { texts }
-  );
-  return response.data.embeddings;
-}
-
-async function getEmbeddingsBatched(texts, batchSize = 50) {
-  const all = [];
-
-  for (let i = 0; i < texts.length; i += batchSize) {
-    const batch = texts.slice(i, i + batchSize);
-    console.log(Embedding batch ${i}–${i + batch.length});
-
-    const emb = await getEmbeddings(batch);
-    all.push(...emb);
-  }
-
-  return all;
-}
-
-/* ---------- TEXT BUILDING ---------- */
-// Normalize spaces/newlines
-function normalizeText(t) {
-  return (t || '')
-    .replace(/\n+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// =====================================
+// EMBEDDINGS
+// =====================================
+//async function getEmbeddings(texts) {
+  //const response = await axios.post(
+    //'https://harmony-ml.onrender.com/embed',
+   // { texts }
+  //);
+ // return response.data.embeddings;
+//}
 
 
-// Remove stopwords by regex
-function removeStopwords(text) {
-  if (!text) return '';
+// =====================================
+// ROUTES
+// =====================================
 
-  let t = text;
-  t = t.replace(/[“”]/g, '"');
-
-  for (const ph of PHRASES_AR) {
-    const phNorm = ph.replace(/[“”]/g, '"');
-    t = t.replaceAll(phNorm, ' ');
-  }
-
-  t = t.replace(/\s+/g, ' ').trim();
-
-  const tokens = t.split(' ').map(tok => {
-    tok = tok.replace(/[.,;:!?()"'\[\]{}<>،؛ـ]/g, '');
-    if (tok.startsWith('ال')) tok = tok.slice(2);
-    return tok.trim();
-  });
-
-  const filtered = tokens.filter(tok => tok && !STOPWORDS_AR.includes(tok));
-  return filtered.join(' ').replace(/\s+/g, ' ').trim();
-}
-
-/* ---------- SAVE CLEAN CSV (BEFORE EMBEDDINGS) ---------- */
-function saveCleanParticipantsCSV(participants) { // Export cleaned text for QA/debug
-  if (!fs.existsSync('data')) fs.mkdirSync('data', { recursive: true });
-
-  const header = [
-    'id',
-    'name',
-    'jobTitle_clean',
-    'academic_clean',
-    'professional_clean',
-    'personal_clean'
-  ].join(',') + '\n';
-
-  const lines = participants.map(p => {
-    const safeName = String(p.name || '').replace(/"/g, '""');
-    const jt = String(p.jobTitleText || '').replace(/"/g, '""');
-    const ac = String(p.academicText || '').replace(/"/g, '""');
-    const pr = String(p.professionalText || '').replace(/"/g, '""');
-    const pe = String(p.personalText || '').replace(/"/g, '""');
-
-    return ${p.id},"${safeName}","${jt}","${ac}","${pr}","${pe}";
-  });
-
-  fs.writeFileSync('data/participants_clean.csv', header + lines.join('\n'), 'utf8');
-}
-
-/* ---------- SAVE FIELD EMBEDDINGS (SEPARATE) ---------- */
-function saveFieldEmbeddingsToCSV(participants) {
-  const header = 'id,name,jobTitle_embedding,academic_embedding,professional_embedding,personal_embedding,profile_embedding\n';
-
-  const rows = participants.map(p => {
-    const safeName = String(p.name || '').replace(/"/g, '""');
-    const jt = JSON.stringify(p.jobTitle_embedding || []).replace(/"/g, '""');
-    const ac = JSON.stringify(p.academic_embedding || []).replace(/"/g, '""');
-    const pr = JSON.stringify(p.professional_embedding || []).replace(/"/g, '""');
-    const pe = JSON.stringify(p.personal_embedding || []).replace(/"/g, '""');
-    const glob = JSON.stringify(p.profile_embedding || []).replace(/"/g, '""');
-
-    return ${p.id},"${safeName}","${jt}","${ac}","${pr}","${pe}","${glob}";
-  });
-
-  const content = header + rows.join('\n');
-
-  fs.writeFileSync(
-    'data/field_embeddings.csv',
-    content,
-    { encoding: 'utf8', flag: 'w' }
-  );
-}
-
-/* ---------- ROUTES ---------- */
-// Health check route
-app.get('/', (req, res) => {
-  res.send('Backend is running');
+// health
+app.get("/", (req, res) => {
+  res.send("Backend is running");
 });
 
-// Reads participants from CSV, builds profile text, computes embeddings, saves them, and returns the result
-app.get('/api/participants', async (req, res) => {
-  const results = [];
-  let index = 0;
-
-  fs.createReadStream('data/participants.csv', { encoding: 'utf8' })
-    .pipe(csv())
-    .on('data', (row) => {
-      const cleanedJob  = removeStopwords(normalizeText(row['Job Title']));
-      const cleanedAcad = removeStopwords(normalizeText(row['Academic Resume']));
-      const cleanedProf = removeStopwords(normalizeText(row['Professional Resume']));
-      const cleanedPers = removeStopwords(normalizeText(row['Personal Resume']));
-
-      results.push({
-        id: index++, // Stable row-based ID
-        name: row['الاسم'] || '',
-        jobTitleText: cleanedJob,
-        academicText: cleanedAcad,
-        professionalText: cleanedProf,
-        personalText: cleanedPers,
-
-        // global profile text
-        profileText: [
-          cleanedAcad,
-          cleanedProf,
-          cleanedPers
-        ].filter(Boolean).join(' ')
-      });
-    })
-    .on('end', async () => {
-      try {
-        // Save cleaned CSV BEFORE embeddings
-        saveCleanParticipantsCSV(results);
-
-        // Prepare texts
-        const jobTexts          = results.map(p => p.jobTitleText);
-        const academicTexts     = results.map(p => p.academicText);
-        const professionalTexts = results.map(p => p.professionalText);
-        const personalTexts     = results.map(p => p.personalText);
-        const profileTexts      = results.map(p => p.profileText);
-
-        // One embedding call for all fields + global
-        const allFieldTexts = [
-          ...jobTexts,
-          ...academicTexts,
-          ...professionalTexts,
-          ...personalTexts,
-          ...profileTexts
-        ].map(t => (t && t.trim()) ? t : ' ');
-
-        console.log("ABOUT TO CALL EMBEDDINGS:", allFieldTexts.length);
-        const allFieldEmbeddings = await getEmbeddingsBatched(allFieldTexts, 40);
-
-        console.log("EMBEDDINGS RETURNED");
-
-        // Split embeddings
-        const n = results.length;
-        const jobEmb  = allFieldEmbeddings.slice(0, n);
-        const acadEmb = allFieldEmbeddings.slice(n, 2 * n);
-        const profEmb = allFieldEmbeddings.slice(2 * n, 3 * n);
-        const persEmb = allFieldEmbeddings.slice(3 * n, 4 * n);
-        const globEmb = allFieldEmbeddings.slice(4 * n, 5 * n);
-
-        results.forEach((p, i) => {
-          p.jobTitle_embedding     = jobEmb[i];
-          p.academic_embedding     = acadEmb[i];
-          p.professional_embedding = profEmb[i];
-          p.personal_embedding     = persEmb[i];
-          p.profile_embedding      = globEmb[i];
-        });
-
-        // Save embeddings CSV
-        saveFieldEmbeddingsToCSV(results);
-
-        res.json(results);
-      } catch (err) {
-        console.error('Embedding error:', err);
-        res.status(500).json({ error: 'Embedding failed' });
-      }
-    });
-});
-
-const { explainPair } = require('./llmExplanation');
-const { getTopMatches } = require('./similarity');
-
-// Returns top-K most similar participants (NO explanation)
-app.get('/api/match/:id', async (req, res) => {
-  const targetId = Number(req.params.id);
-
-  if (Number.isNaN(targetId)) {
-    return res.status(400).json({ error: 'Invalid participant ID' });
-  }
-
+// ✅ COSMOS PARTICIPANTS
+app.get("/api/participants", async (req, res) => {
   try {
-    console.log('Requested match for ID:', targetId);
+    const { resources } = await container.items.readAll().fetchAll();
+    res.json(resources);
+    console.log("🔥 DATA SOURCE: COSMOS DB");
+console.log("Total participants:", resources.length);
+  } catch (err) {
+    console.error("Cosmos ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch from Cosmos" });
+  }
+});
+// MATCHING
+const { getTopMatches } = require("./similarity");
+
+app.get("/api/match/:id", async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
 
     const matches = await getTopMatches(targetId, 5);
-    console.log(
-  'Image for first match:',
-  matches[0]?.id,
-  imagesById.get(String(matches[0]?.id))
-);
 
-    const explainedMatches = await Promise.all(
-      matches.map(async (m) => {
-        const exp = await explainPair(targetId, m.id);
+    res.json(matches);
 
-                return {
-          id: m.id,
-          name: m.name,
-          score: m.score,
-          breakdown: m.breakdown,
-
-          reason: exp.explanation?.ar || null,
-          reason_en: exp.explanation?.en || null,
-          reason_he: exp.explanation?.he || null,
-
-          // 🔹 חדש – שם מתורגם בנפרד
-          match_name: exp.match_name || null,
-
-
-          imageUrl: imagesById.get(String(m.id)) || null
-        };
-
-      })
-    );
-
-    res.json(explainedMatches);
   } catch (err) {
-    console.error('Match error:', err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
-/* ---------- START SERVER ---------- */
-loadImagesFromParticipantsCsv().catch(err => {
-  console.error('❌ Failed to load images from participants.csv:', err);
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(Server running on port ${PORT});
-});
 
 
-/* ---------- EMBEDDING CLIENT ---------- */
 
-async function getEmbeddings(texts) {
-  const response = await axios.post(
-    'http://localhost:8000/embed',
-    { texts }
-  );
-  return response.data.embeddings;
+
+
+
+
+/* ========================
+   HELPERS
+======================== */
+
+function normalizePhone(phone) {
+  return String(phone || "").replace(/[^\d]/g, "").trim();
 }
 
-async function getEmbeddingsBatched(texts, batchSize = 50) {
-  const all = [];
+function toParticipantDocId(userId) {
+  const s = String(userId || "").trim();
+  return s.startsWith("p") ? s : `p${s}`; // ✅ FIXED
+}
 
-  for (let i = 0; i < texts.length; i += batchSize) {
-    const batch = texts.slice(i, i + batchSize);
-    console.log(Embedding batch ${i}–${i + batch.length});
+function toRouteParticipantId(docId) {
+  const s = String(docId || "").trim();
+  return s.startsWith("p") ? s.slice(1) : s;
+}
 
-    const emb = await getEmbeddings(batch);
-    all.push(...emb);
+async function getParticipantDocByRouteId(userId) {
+  const docId = toParticipantDocId(userId);
+
+  const querySpec = {
+    query: "SELECT TOP 1 * FROM c WHERE c.id = @id",
+    parameters: [{ name: "@id", value: docId }],
+  };
+
+  const { resources } = await container.items.query(querySpec).fetchAll();
+  return resources[0] || null;
+}
+
+/* ========================
+   MIDDLEWARE
+======================== */
+
+app.use(cors());
+app.use(express.json());
+
+/* ========================
+   BASIC ROUTES
+======================== */
+
+app.get("/", (req, res) => {
+  res.send("Backend is running");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ ok: true });
+});
+
+/* ========================
+   DB TEST
+======================== */
+
+app.get("/test-db", async (req, res) => {
+  try {
+    const { resource } = await database.read();
+
+    res.json({
+      ok: true,
+      message: "Database connected successfully",
+      databaseId: resource.id,
+      containerId: container.id,
+    });
+  } catch (error) {
+    console.error("DB error:", error.message);
+
+    res.status(500).json({
+      ok: false,
+      message: "Database connection failed",
+      error: error.message,
+    });
   }
-
-  return all;
-}
-
-/* ---------- TEXT BUILDING ---------- */
-// Normalize spaces/newlines
-function normalizeText(t) {
-  return (t || '')
-    .replace(/\n+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Common generic words to remove
-const STOPWORDS_AR = [
-  'مهندس','شهادة','لقب','اول','ثاني','بكالوريوس','ماجستير',
-  'خبرة','دورة','متدرب','حاصل','مهندسة','مستشار','متدربة','حاصلة'
-];
-
-const PHRASES_AR = [
-  'يتطوّع في مجتمع “هارموني” ضمن',
-  'تتطوّع في مجتمع “هارموني” ضمن'
-];
-
-// Remove stopwords by regex
-function removeStopwords(text) {
-  if (!text) return '';
-
-  let t = text;
-  t = t.replace(/[“”]/g, '"');
-
-  for (const ph of PHRASES_AR) {
-    const phNorm = ph.replace(/[“”]/g, '"');
-    t = t.replaceAll(phNorm, ' ');
-  }
-
-  t = t.replace(/\s+/g, ' ').trim();
-
-  const tokens = t.split(' ').map(tok => {
-    tok = tok.replace(/[.,;:!?()"'\[\]{}<>،؛ـ]/g, '');
-    if (tok.startsWith('ال')) tok = tok.slice(2);
-    return tok.trim();
-  });
-
-  const filtered = tokens.filter(tok => tok && !STOPWORDS_AR.includes(tok));
-  return filtered.join(' ').replace(/\s+/g, ' ').trim();
-}
-
-/* ---------- SAVE CLEAN CSV (BEFORE EMBEDDINGS) ---------- */
-function saveCleanParticipantsCSV(participants) {
-  if (!fs.existsSync('data')) fs.mkdirSync('data', { recursive: true });
-
-  const header = 'id,name,jobTitle_clean,academic_clean,professional_clean,personal_clean\n';
-
-  const rows = participants.map(p =>
-    ${p.id},"${p.name}","${p.jobTitleText}","${p.academicText}","${p.professionalText}","${p.personalText}"
-  );
-
-  fs.writeFileSync('data/participants_clean.csv', header + rows.join('\n'), 'utf8');
-}
-
-/* ---------- SAVE FIELD EMBEDDINGS (SEPARATE) ---------- */
-function saveFieldEmbeddingsToCSV(participants) {
-  const header = 'id,name,jobTitle_embedding,academic_embedding,professional_embedding,personal_embedding,profile_embedding\n';
-
-  const rows = participants.map(p =>
-    ${p.id},"${p.name}","${JSON.stringify(p.jobTitle_embedding)}","${JSON.stringify(p.academic_embedding)}","${JSON.stringify(p.professional_embedding)}","${JSON.stringify(p.personal_embedding)}","${JSON.stringify(p.profile_embedding)}"
-  );
-
-  fs.writeFileSync('data/field_embeddings.csv', header + rows.join('\n'), 'utf8');
-}
-
-/* ---------- ROUTES ---------- */
-// Health check route
-
-app.get('/', (req, res) => {
-  res.send('Backend is running');
 });
 
-/* ✅ NOW USING COSMOS DB */
-app.get('/api/participants', async (req, res) => {
+/* ========================
+   ROUTES
+======================== */
+
+//app.use("/api/auth", authRoutes);
+//app.use("/api/participants", participantRoutes);
+
+/* ========================
+   TEST ROUTES
+======================== */
+
+app.get("/test-save", async (req, res) => {
+  try {
+    const { resource } = await container.item("p1", "event1").read();
+
+    resource.saved = resource.saved || [];
+
+    if (!resource.saved.includes("p2")) {
+      resource.saved.push("p2");
+    }
+
+    const { resource: updated } = await container
+      .item("p1", "event1")
+      .replace(resource);
+
+    res.json({ message: "Test save worked", saved: updated.saved });
+  } catch (error) {
+    res.status(500).json({ message: "Test save failed", error: error.message });
+  }
+});
+
+app.get("/test-unsave", async (req, res) => {
+  try {
+    const { resource } = await container.item("p1", "event1").read();
+
+    resource.saved = (resource.saved || []).filter((item) => item !== "p2");
+
+    const { resource: updated } = await container
+      .item("p1", "event1")
+      .replace(resource);
+
+    res.json({ message: "Test unsave worked", saved: updated.saved });
+  } catch (error) {
+    res.status(500).json({ message: "Test unsave failed", error: error.message });
+  }
+});
+
+app.get("/test-met", async (req, res) => {
+  try {
+    const { resource } = await container.item("p1", "event1").read();
+
+    resource.met = resource.met || [];
+
+    if (!resource.met.includes("p2")) {
+      resource.met.push("p2");
+    }
+
+    const { resource: updated } = await container
+      .item("p1", "event1")
+      .replace(resource);
+
+    res.json({ message: "Test met worked", met: updated.met });
+  } catch (error) {
+    res.status(500).json({ message: "Test met failed", error: error.message });
+  }
+});
+
+app.get("/test-unmet", async (req, res) => {
+  try {
+    const { resource } = await container.item("p1", "event1").read();
+
+    resource.met = (resource.met || []).filter((item) => item !== "p2");
+
+    const { resource: updated } = await container
+      .item("p1", "event1")
+      .replace(resource);
+
+    res.json({ message: "Test unmet worked", met: updated.met });
+  } catch (error) {
+    res.status(500).json({ message: "Test unmet failed", error: error.message });
+  }
+});
+
+/* ========================
+   SAVE
+======================== */
+
+app.post("/api/save", async (req, res) => {
+  try {
+    const { userId, targetId, remove } = req.body;
+
+    const resource = await getParticipantDocByRouteId(userId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "User document not found" });
+    }
+
+    resource.saved = resource.saved || [];
+
+    if (remove) {
+      resource.saved = resource.saved.filter(
+        (id) => String(id) !== String(targetId)
+      );
+    } else {
+      if (!resource.saved.map(String).includes(String(targetId))) {
+        resource.saved.push(String(targetId));
+      }
+    }
+
+    const { resource: updated } = await container
+      .item(resource.id, resource.event_id)
+      .replace(resource);
+
+    res.json({ saved: updated.saved || [] });
+  } catch (error) {
+    res.status(500).json({ message: "Save failed", error: error.message });
+  }
+});
+
+/* ========================
+   MET
+======================== */
+
+app.post("/api/met", async (req, res) => {
+  try {
+    const { userId, targetId, remove } = req.body;
+
+    const resource = await getParticipantDocByRouteId(userId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "User document not found" });
+    }
+
+    resource.met = resource.met || [];
+
+    if (remove) {
+      resource.met = resource.met.filter(
+        (id) => String(id) !== String(targetId)
+      );
+    } else {
+      if (!resource.met.map(String).includes(String(targetId))) {
+        resource.met.push(String(targetId));
+      }
+    }
+
+    const { resource: updated } = await container
+      .item(resource.id, resource.event_id)
+      .replace(resource);
+
+    res.json({ met: updated.met || [] });
+  } catch (error) {
+    res.status(500).json({ message: "Met failed", error: error.message });
+  }
+});
+
+/* ========================
+   CREATE PARTICIPANT
+======================== */
+
+app.post("/api/participants", async (req, res) => {
+  try {
+    const body = req.body;
+
+    const newParticipant = {
+      id: `p${Date.now()}`, // ✅ FIXED
+      name: body.name || "",
+      phone: body.phone || "",
+      job: body.job || "",
+      academic: body.academic || "",
+      professional: body.professional || "",
+      personal: body.personal || "",
+      image: body.image || "",
+      hidden: false,
+    };
+
+    await container.items.create(newParticipant);
+
+    res.status(201).json({ participant: newParticipant });
+  } catch (error) {
+    res.status(500).json({
+      message: "Create participant failed",
+      error: error.message,
+    });
+  }
+});
+
+/* ========================
+   FETCH SAVED / MET
+======================== */
+
+app.get("/api/saved/:id", async (req, res) => {
+  try {
+    const resource = await getParticipantDocByRouteId(req.params.id);
+    res.json(resource?.saved || []);
+  } catch (error) {
+    res.status(500).json({ message: "Fetch saved failed", error: error.message });
+  }
+});
+
+app.get("/api/met/:id", async (req, res) => {
+  try {
+    const resource = await getParticipantDocByRouteId(req.params.id);
+    res.json(resource?.met || []);
+  } catch (error) {
+    res.status(500).json({ message: "Fetch met failed", error: error.message });
+  }
+});
+
+/* ========================
+   PHONE LOGIN
+======================== */
+
+app.post("/api/auth/phone-login", async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+
+    if (!phone) {
+      return res.status(400).json({ message: "Phone is required" });
+    }
+
+    const querySpec = {
+      query: "SELECT TOP 1 c.id, c.phone FROM c WHERE c.phone = @phone",
+      parameters: [{ name: "@phone", value: phone }],
+    };
+
+    const { resources } = await container.items.query(querySpec).fetchAll();
+    const user = resources[0];
+
+    if (!user) {
+      return res.status(404).json({ message: "Participant not found" });
+    }
+
+    res.json({
+      ok: true,
+      participantId: toRouteParticipantId(user.id),
+      docId: user.id,
+      phone: user.phone,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Phone login failed",
+      error: error.message,
+    });
+  }
+});
+// =====================================
+// ROUTES
+// =====================================
+
+// health
+app.get("/", (req, res) => {
+  res.send("Backend is running");
+});
+app.get("/test-data", async (req, res) => {
   try {
     const { resources } = await container.items.readAll().fetchAll();
 
-    const results = resources.map((row, index) => {
-      const cleanedJob  = removeStopwords(normalizeText(row.job));
-      const cleanedAcad = removeStopwords(normalizeText(row.academic));
-      const cleanedProf = removeStopwords(normalizeText(row.professional));
-      const cleanedPers = removeStopwords(normalizeText(row.personal));
-
-      return {
-        id: index,
-        name: row.name || '',
-        jobTitleText: cleanedJob,
-        academicText: cleanedAcad,
-        professionalText: cleanedProf,
-        personalText: cleanedPers,
-
-        profileText: [
-          cleanedAcad,
-          cleanedProf,
-          cleanedPers
-        ].filter(Boolean).join(' ')
-      };
+    res.json({
+      count: resources.length,
+      firstItem: resources[0] || null,
     });
-
-    saveCleanParticipantsCSV(results);
-
-    const jobTexts = results.map(p => p.jobTitleText);
-    const academicTexts = results.map(p => p.academicText);
-    const professionalTexts = results.map(p => p.professionalText);
-    const personalTexts = results.map(p => p.personalText);
-    const profileTexts = results.map(p => p.profileText);
-
-    const allTexts = [...jobTexts, ...academicTexts, ...professionalTexts, ...personalTexts, ...profileTexts];
-
-    const embeddings = await getEmbeddingsBatched(allTexts, 40);
-
-    const n = results.length;
-
-    results.forEach((p, i) => {
-      p.jobTitle_embedding = embeddings[i];
-      p.academic_embedding = embeddings[i + n];
-      p.professional_embedding = embeddings[i + 2*n];
-      p.personal_embedding = embeddings[i + 3*n];
-      p.profile_embedding = embeddings[i + 4*n];
-    });
-
-    saveFieldEmbeddingsToCSV(results);
-
-    res.json(results);
-
-  } catch (err) {
-    console.error('Cosmos FULL ERROR:', err.message);
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch from Cosmos' });
-  }
-});
-
-//const { explainPair } = require('./llmExplanation');
-const { getTopMatches } = require('./similarity');
-
-app.get('/api/match/:id', async (req, res) => {
-  const targetId = Number(req.params.id);
-
-  try {
-    const matches = await getTopMatches(targetId, 5);
-
-    const explained = await Promise.all(
-      matches.map(async (m) => {
-        //const exp = await explainPair(targetId, m.id);
-        const exp = {};
-
-        return {
-          id: m.id,
-          name: m.name,
-          score: m.score,
-          breakdown: m.breakdown,
-          reason: exp.explanation?.ar || null
-        };
-      })
-    );
-
-    res.json(explained);
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
+// ✅ ADD IT HERE
+app.get("/test-db", async (req, res) => {
+  try {
+    const { resource } = await database.read();
 
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
+    res.json({
+      ok: true,
+      message: "Database connected successfully",
+      databaseId: resource.id,
+      containerId: container.id,
+    });
+  } catch (error) {
+    console.error("DB error:", error.message);
+
+    res.status(500).json({
+      ok: false,
+      message: "Database connection failed",
+      error: error.message,
+    });
+  }
+});
+
+// =====================================
+// START SERVER
+// =====================================
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
