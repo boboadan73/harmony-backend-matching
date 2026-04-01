@@ -28,13 +28,13 @@ console.log("✅ Server starting...");
 // =====================================
 // EMBEDDINGS
 // =====================================
-//async function getEmbeddings(texts) {
-  //const response = await axios.post(
-    //'https://harmony-ml.onrender.com/embed',
-   // { texts }
-  //);
- // return response.data.embeddings;
-//}
+async function getEmbeddings(texts) {
+  const response = await axios.post(
+    'https://harmony-ml.onrender.com/embed',
+    { texts }
+  );
+  return response.data.embeddings;
+}
 
 
 // =====================================
