@@ -21,8 +21,11 @@ app.use(cors({
   origin: ['https://harmony-frontend-iota.vercel.app'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
+
 }));
 
+app.options('*', cors());
 console.log("✅ Server starting...");
 
 // =====================================
