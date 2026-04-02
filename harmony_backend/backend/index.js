@@ -67,10 +67,13 @@ app.get("/api/match/:id", async (req, res) => {
         const explanation = await explainPair(targetId, m.id);
 
         return {
-          ...m,
-          explanation: explanation.explanation, // ar/en/he
-          match_name: explanation.match_name
-        };
+  ...m,
+  reason: explanation?.explanation?.ar || '',
+  reason_ar: explanation?.explanation?.ar || '',
+  reason_en: explanation?.explanation?.en || '',
+  reason_he: explanation?.explanation?.he || '',
+  match_name: explanation?.match_name || null
+};
       })
     );
 
