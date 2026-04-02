@@ -16,25 +16,17 @@ const client = new CosmosClient({
 const database = client.database("harmony-db");
 const container = database.container("participants");
 
-// ===== MIDDLEWARE =====
-app.use(cors({
-  origin: ['https://harmony-frontend-iota.vercel.app'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true,
-}));
-
-console.log("✅ Server starting...");
 
 // =====================================
 // EMBEDDINGS
 // =====================================
-//async function getEmbeddings(texts) {
-  //const response = await axios.post(
-    //'https://harmony-ml.onrender.com/embed',
-   // { texts }
-  //);
- // return response.data.embeddings;
-//}
+async function getEmbeddings(texts) {
+  const response = await axios.post(
+  'https://harmony-ml.onrender.com/embed',
+    { texts }
+  );
+  return response.data.embeddings;
+}
 
 
 // =====================================
