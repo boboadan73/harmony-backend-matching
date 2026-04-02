@@ -21,8 +21,6 @@ app.use(cors({
   origin: ['https://harmony-frontend-iota.vercel.app'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
-
 }));
 
 console.log("✅ Server starting...");
@@ -30,13 +28,13 @@ console.log("✅ Server starting...");
 // =====================================
 // EMBEDDINGS
 // =====================================
-async function getEmbeddings(texts) {
-  const response = await axios.post(
-    'https://harmony-ml.onrender.com/embed',
-    { texts }
-  );
-  return response.data.embeddings;
-}
+//async function getEmbeddings(texts) {
+  //const response = await axios.post(
+    //'https://harmony-ml.onrender.com/embed',
+   // { texts }
+  //);
+ // return response.data.embeddings;
+//}
 
 
 // =====================================
@@ -62,22 +60,35 @@ console.log("Total participants:", resources.length);
 });
 // MATCHING
 const { getTopMatches } = require("./similarity");
+const { explainPair } = require("./llmExplanation");
+
 
 app.get("/api/match/:id", async (req, res) => {
   try {
-    const targetId = Number(req.params.id);
+    const targetId = parseInt(req.params.id);
 
-    const matches = await getTopMatches(targetId, 5);
+    const matches = await getTopMatches(targetId,5);
 
-    res.json(matches);
+    // 🔥 ADD THIS PART
+    const matchesWithExplanation = await Promise.all(
+      matches.map(async (m) => {
+        const explanation = await explainPair(targetId, m.id);
+
+        return {
+          ...m,
+          explanation: explanation.explanation, // ar/en/he
+          match_name: explanation.match_name
+        };
+      })
+    );
+
+    res.json(matchesWithExplanation);
 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
-
-
 
 
 
@@ -449,8 +460,8 @@ app.get("/test-db", async (req, res) => {
 // =====================================
 // START SERVER
 // =====================================
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
