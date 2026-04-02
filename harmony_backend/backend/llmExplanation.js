@@ -1,7 +1,22 @@
-const fs = require('fs');                // File system module for reading and writing files
-const csv = require('csv-parser');       // CSV parser for streaming CSV rows
 require("dotenv").config();
+const fs = require("fs");
+const { CosmosClient } = require("@azure/cosmos");
 
+/* ------------------ COSMOS ------------------ */
+
+const client = new CosmosClient({
+  endpoint: process.env.COSMOS_ENDPOINT,
+  key: process.env.COSMOS_KEY,
+});
+
+const database = client.database("harmony-db");
+const container = database.container("participants");
+
+async function loadParticipants() {
+  const query = { query: "SELECT * FROM c" };
+  const { resources } = await container.items.query(query).fetchAll();
+  return resources;
+}
 /* ------------------ Math ------------------ */
 
 // Computes cosine similarity between two numeric vectors
@@ -49,56 +64,6 @@ function writeCache(cache) {
   );
 }
 
-/* ------------------ Data Loading ------------------ */
-
-// Loads field-level embeddings (job, academic, professional, personal) from CSV
-function loadFieldEmbeddings() {
-  return new Promise((resolve, reject) => {
-    const participants = [];
-
-    fs.createReadStream('data/field_embeddings.csv', { encoding: 'utf8' })
-      .pipe(csv())
-      .on('data', (row) => {
-        try {
-          participants.push({
-            id: parseInt(row.id),
-            name: row.name || '',
-            jobTitle_emb: JSON.parse(row.jobTitle_embedding || '[]'),
-            academic_emb: JSON.parse(row.academic_embedding || '[]'),
-            professional_emb: JSON.parse(row.professional_embedding || '[]'),
-            personal_emb: JSON.parse(row.personal_embedding || '[]'),
-          });
-        } catch (e) {
-          // Skip rows with malformed embeddings
-        }
-      })
-      .on('end', () => resolve(participants))
-      .on('error', reject);
-  });
-}
-
-// Loads raw participant text fields used for explanation generation
-function loadParticipantTexts() {
-  return new Promise((resolve, reject) => {
-    const participants = [];
-    let idx = 0;
-
-    fs.createReadStream('data/participants.csv', { encoding: 'utf8' })
-      .pipe(csv())
-      .on('data', (row) => {
-        participants.push({
-          id: idx++, // ID based on CSV row order (must match embedding generation)
-          jobTitle: (row['Job Title'] || '').toString(),
-          academic: (row['Academic Resume'] || '').toString(),
-          professional: (row['Professional Resume'] || '').toString(),
-          personal: (row['Personal Resume'] || '').toString(),
-          name: (row['الاسم'] || '').toString(),
-        });
-      })
-      .on('end', () => resolve(participants))
-      .on('error', reject);
-  });
-}
 
 /* ------------------ LLM ------------------ */
 
@@ -118,7 +83,7 @@ function extractText(choice) {
 }
 
 // Limits
-const EXPLANATION_MAX_TOKENS = 250;
+const EXPLANATION_MAX_TOKENS = 120;
 const TRANSLATION_MAX_TOKENS = 400;
 const NAME_TRANSLATION_MAX_TOKENS = 40;
 
@@ -312,57 +277,77 @@ function computeCrossFieldSimilarities(aEmb, bEmb) {
 
 /* ------------------ Explanation ------------------ */
 
-// Generates and caches an explanation for why two participants are a good match
 async function explainPair(targetId, matchId) {
   const key = cacheKey(targetId, matchId);
   const cache = readCache();
   if (cache[key]) return cache[key];
 
-  const [embRows, textRows] = await Promise.all([
-    loadFieldEmbeddings(),
-    loadParticipantTexts()
-  ]);
+  // ✅ Load from Cosmos
+  const participants = await loadParticipants();
 
-  const aEmb = embRows.find(p => p.id === targetId);
-  const bEmb = embRows.find(p => p.id === matchId);
-  if (!aEmb || !bEmb) {
-    throw new Error('One or both participants not found in field_embeddings.csv');
+  // ✅ IMPORTANT: Cosmos IDs are "p401"
+  const a = participants.find(p => p.id === `p${targetId}`);
+  const b = participants.find(p => p.id === `p${matchId}`);
+
+  if (!a || !b) {
+    throw new Error("Participants not found in Cosmos");
   }
 
-  const aText = textRows.find(p => p.id === targetId);
-  const bText = textRows.find(p => p.id === matchId);
-  if (!aText || !bText) {
-    throw new Error('One or both participants not found in participants.csv (by row order id)');
-  }
-
+  // ✅ Use embeddings from Cosmos (NOT CSV)
   const fieldScores = {
-    jobTitle: cosineSimilarity(aEmb.jobTitle_emb, bEmb.jobTitle_emb),
-    academic: cosineSimilarity(aEmb.academic_emb, bEmb.academic_emb),
-    professional: cosineSimilarity(aEmb.professional_emb, bEmb.professional_emb),
-    personal: cosineSimilarity(aEmb.personal_emb, bEmb.personal_emb),
+    jobTitle: cosineSimilarity(a.job_embedding || [], b.job_embedding || []),
+    academic: cosineSimilarity(a.academic_embedding || [], b.academic_embedding || []),
+    professional: cosineSimilarity(a.professional_embedding || [], b.professional_embedding || []),
+    personal: cosineSimilarity(a.personal_embedding || [], b.personal_embedding || []),
   };
 
+  // Rank fields
   const ranked = Object.entries(fieldScores)
     .sort((x, y) => y[1] - x[1])
     .map(([field, score]) => ({ field, score }));
 
   const bestField = ranked[0].field;
-  const aVal = (aText[bestField] || "").trim();
-  const bVal = (bText[bestField] || "").trim();
+
+  function getFieldText(p, field) {
+  const map = {
+    jobTitle: p["Job Title"],
+    academic: p["Academic Resume"],
+    professional: p["Professional Resume"],
+    personal: p["Personal Resume"]
+  };
+  return (map[field] || "").trim();
+}
+  // ✅ Use TEXT directly from Cosmos
+ const aVal = getFieldText(a, bestField);
+const bVal = getFieldText(b, bestField);
 
   const topFields = ranked.slice(0, 2);
 
   const reasons = topFields.map(r => ({
-    field: r.field,
-    fieldLabel: normalizeFieldLabel(r.field),
-    score: r.score,
-    aText: (aText[r.field] || '').trim(),
-    bText: (bText[r.field] || '').trim(),
-  }));
+  field: r.field,
+  fieldLabel: normalizeFieldLabel(r.field),
+  score: r.score,
+  aText: getFieldText(a, r.field),
+  bText: getFieldText(b, r.field),
+}));
 
-  const crossField = computeCrossFieldSimilarities(aEmb, bEmb);
+  // ✅ Cross-field similarity
+  const crossField = computeCrossFieldSimilarities(
+    {
+      jobTitle_emb: a.job_embedding,
+      academic_emb: a.academic_embedding,
+      professional_emb: a.professional_embedding,
+      personal_emb: a.personal_embedding,
+    },
+    {
+      jobTitle_emb: b.job_embedding,
+      academic_emb: b.academic_embedding,
+      professional_emb: b.professional_embedding,
+      personal_emb: b.personal_embedding,
+    }
+  );
+
   const topCross = crossField.slice(0, 1);
-
   // System message (Arabic-only explanation)
   const systemMessage = `
 أنت تكتب شرحًا موجّهًا مباشرة إلى المستخدم نفسه.
@@ -393,7 +378,7 @@ async function explainPair(targetId, matchId) {
 
   const prompt = `
 المشارك المقترح:
-${bText.name}
+${b.name}
 
 المجال المشترك:
 ${normalizeFieldLabel(bestField)}
@@ -422,7 +407,7 @@ ${bVal}
   }
 
   // NEW: Name translations (separate fields)
-  const rawMatchName = (bText.name || '').trim();
+  const rawMatchName = (b.name || '').trim();
   let match_name_en = null;
   let match_name_he = null;
 
@@ -439,8 +424,8 @@ ${bVal}
   }
 
   const result = {
-    target: { id: aEmb.id, name: aEmb.name },
-    match: { id: bEmb.id, name: bEmb.name },
+    target: { id: a.id, name: a.name },
+    match: { id: b.id, name: b.name },
     fieldScores,
     rankedFields: ranked,
     reasons,
@@ -449,9 +434,8 @@ ${bVal}
       en: llmExplanation_en,
       he: llmExplanation_he
     },
-    // NEW: translated match name returned separately
     match_name: {
-      original: rawMatchName || null,
+      original: rawMatchName,
       en: match_name_en,
       he: match_name_he
     }
@@ -465,3 +449,4 @@ ${bVal}
 
 // Export explanation function for use in API routes
 module.exports = { explainPair };
+
