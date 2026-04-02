@@ -11,12 +11,14 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@azure/cosmos": "^4.9.2",
     "axios": "^1.13.2",
     "cors": "^2.8.6",
     "csv-parser": "^3.2.0",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "groq-sdk": "^0.37.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "xlsx": "^0.18.5"
   }
 }
