@@ -17,12 +17,13 @@ const database = client.database("harmony-db");
 const container = database.container("participants");
 
 
+
 // =====================================
 // EMBEDDINGS
 // =====================================
 async function getEmbeddings(texts) {
   const response = await axios.post(
-  'https://harmony-ml.onrender.com/embed',
+    'https://harmony-ml.onrender.com/embed',
     { texts }
   );
   return response.data.embeddings;
@@ -67,13 +68,10 @@ app.get("/api/match/:id", async (req, res) => {
         const explanation = await explainPair(targetId, m.id);
 
         return {
-  ...m,
-  reason: explanation?.explanation?.ar || '',
-  reason_ar: explanation?.explanation?.ar || '',
-  reason_en: explanation?.explanation?.en || '',
-  reason_he: explanation?.explanation?.he || '',
-  match_name: explanation?.match_name || null
-};
+          ...m,
+          explanation: explanation.explanation, // ar/en/he
+          match_name: explanation.match_name
+        };
       })
     );
 
