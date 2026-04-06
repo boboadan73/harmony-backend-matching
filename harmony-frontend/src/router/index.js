@@ -6,7 +6,9 @@ import SavedView from '../views/SavedView.vue'
 import MetView from '../views/MetView.vue'
 import ProfileView from '../views/ProfileView.vue'
 
-const withPidOrLogin = (base) => {
+function getStoredPid() {
+  if (typeof window === 'undefined') return ''
+
   const pid = String(localStorage.getItem('harmony_pid') || '').trim()
 
   const hasValidPid =
@@ -14,7 +16,12 @@ const withPidOrLogin = (base) => {
     pid !== 'null' &&
     pid !== 'undefined'
 
-  return hasValidPid ? `/${base}/${pid}` : '/login'
+  return hasValidPid ? pid : ''
+}
+
+const withPidOrLogin = (base) => {
+  const pid = getStoredPid()
+  return pid ? `/${base}/${pid}` : '/login'
 }
 
 const router = createRouter({
@@ -23,32 +30,28 @@ const router = createRouter({
     { path: '/', redirect: '/login' },
     { path: '/login', component: LoginView },
 
-    // ✅ אם מישהו מגיע בלי id – ננתב אוטומטית לפי harmony_pid
     { path: '/matches', redirect: () => withPidOrLogin('matches') },
     { path: '/saved', redirect: () => withPidOrLogin('saved') },
     { path: '/met', redirect: () => withPidOrLogin('met') },
     { path: '/profile', redirect: () => withPidOrLogin('profile') },
 
-    // ✅ הדפים האמיתיים עם id
     { path: '/matches/:id', component: MatchesView },
     { path: '/saved/:id', component: SavedView },
     { path: '/met/:id', component: MetView },
     { path: '/profile/:id', component: ProfileView },
+    
   ],
 })
+
 router.beforeEach((to, from, next) => {
-  const rawPid = localStorage.getItem('harmony_pid')
-  const pid = String(rawPid || '').trim()
+  const pid = getStoredPid()
 
-  const hasValidPid =
-    pid !== '' &&
-    pid !== 'null' &&
-    pid !== 'undefined'
+  const isPublicPage =
+    to.path === '/login' ||
+    to.path === '/register' ||
+    to.path === '/profile/new'
 
-  const publicPages = ['/login']
-  const isPublicPage = publicPages.includes(to.path)
-
-  if (!isPublicPage && !hasValidPid) {
+  if (!isPublicPage && !pid) {
     return next('/login')
   }
 

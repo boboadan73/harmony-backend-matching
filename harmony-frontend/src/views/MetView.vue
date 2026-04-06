@@ -1,69 +1,73 @@
 <template>
-  <div class="container">
-    <div class="shell" :dir="isRtl ? 'rtl' : 'ltr'">
-      <!-- background decorations -->
-      <div class="blob blob1" aria-hidden="true"></div>
-      <div class="blob blob2" aria-hidden="true"></div>
-      <div class="blob blob3" aria-hidden="true"></div>
+  <div class="matches-page" :dir="isRtl ? 'rtl' : 'ltr'">
+    <TopNav :lang="lang" :pid="route.params.id" />
 
-      <div class="page">
-        <TopNav :lang="lang" :pid="route.params.id" />
-
-        <!-- header + language -->
-        <div class="headerRow">
-          <div class="titles">
-            <h1 class="h1">{{ t.title }}</h1>
-            <p class="subtitle">{{ t.subtitle }}</p>
-          </div>
-
-          <div class="langBox">
-            <span class="langIcon" aria-hidden="true">🌐</span>
-            <select class="langSelect" v-model="lang">
-              <option value="en">English</option>
-              <option value="ar">Arabic</option>
-              <option value="he">Hebrew</option>
-            </select>
-          </div>
+    <main class="matches-wrap">
+      <section class="page-head">
+        <div class="title-box">
+          <h1 class="page-title">{{ t.title }}</h1>
+          <p class="page-subtitle">{{ t.subtitle }}</p>
         </div>
 
-        <div v-if="metMatches.length === 0" class="empty">
-          <div class="emptyIcon" aria-hidden="true">🤝</div>
-          <div class="emptyText">
-            <div class="emptyTitle">{{ t.emptyTitle }}</div>
-            <div class="emptySub">{{ t.emptySub }}</div>
-          </div>
+        <div class="language-box">
+          <span class="language-icon" aria-hidden="true">🌐</span>
+          <select class="language-select" v-model="lang">
+            <option value="en">English</option>
+            <option value="ar">Arabic</option>
+            <option value="he">Hebrew</option>
+          </select>
         </div>
+      </section>
 
-        <div v-else class="list">
-          <div v-for="m in metMatches" :key="m.id" class="card">
-            <div class="cardGlow" aria-hidden="true"></div>
+      <div v-if="metMatches.length === 0" class="state-box">
+        <div class="state-icon" aria-hidden="true">🤝</div>
+        <div>
+          <div class="state-title">{{ t.emptyTitle }}</div>
+          <div class="state-sub">{{ t.emptySub }}</div>
+        </div>
+      </div>
 
-            <div class="cardHeader">
-              <div class="info">
-                <div class="name">{{ getName(m) }}</div>
-                <div class="role">{{ pick(m.role) }}</div>
+      <section v-else class="matches-list">
+        <article
+          v-for="m in metMatches"
+          :key="m.id"
+          class="match-card"
+        >
+          <div class="match-top">
+            <div class="match-main">
+              <div class="name-row">
+                <h2 class="match-name">{{ getName(m) }}</h2>
               </div>
 
-              <img class="avatar" :src="m.avatar" alt="avatar" />
+              <div v-if="getWhy(m)" class="why-section">
+                <div class="why-title">{{ t.why }}</div>
+                <div class="why-text">{{ getWhy(m) }}</div>
+              </div>
             </div>
 
-            <div class="why">
-              <strong>{{ t.why }}</strong>
-              <!-- ✅ תיקון: למה-התאמה לפי שפה (לא pick על שדה בודד) -->
-              {{ getWhy(m) }}
-            </div>
-
-            <div class="actions">
-              <button class="btn btnOutline" @click="unmarkMet(m)">
-                {{ t.remove }}
-              </button>
+            <div class="avatar-side">
+              <img
+                class="match-avatar"
+                :src="m.avatar"
+                alt="avatar"
+                loading="lazy"
+                @error="onAvatarError"
+              />
             </div>
           </div>
-        </div>
 
-        <div class="spacerBottom"></div>
-      </div>
-    </div>
+          <div class="status-row">
+            <span class="status-pill">{{ t.title }}</span>
+          </div>
+
+          <div class="actions-row single-action">
+            <button class="action-btn met-btn" @click="unmarkMet(m)">
+              {{ t.remove }}
+            </button>
+          </div>
+        </article>
+      </section>
+    </main>
   </div>
 </template>
 
@@ -71,6 +75,8 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TopNav from '@/components/TopNav.vue'
+import { buildApiUrl, buildMatchApiUrl } from '@/services/api'
+import defaultAvatar from '@/assets/default-avatar.png'
 
 const route = useRoute()
 
@@ -115,6 +121,7 @@ function pick(field) {
   if (typeof field === 'string') return field
   return field[lang.value] || field.en || field.he || field.ar || ''
 }
+
 function getName(m) {
   if (!m) return ''
 
@@ -128,8 +135,6 @@ function getName(m) {
   return original || en || he || ''
 }
 
-
-/* ✅ חדש: מחזיר סיבת התאמה לפי שפה (כמו ב-Matches) */
 function getWhy(m) {
   if (!m) return ''
   if (lang.value === 'en') return m.whyMatched_en || m.whyMatched || m.whyMatched_he || ''
@@ -156,7 +161,6 @@ function loadMetIds() {
 
 /* ===== Data ===== */
 const allMetMatches = ref([])
-import defaultAvatar from '@/assets/default-avatar.png'
 const placeholderAvatar = defaultAvatar
 
 function normalizeResponse(data) {
@@ -173,11 +177,15 @@ async function fetchMetMatches() {
   }
 
   try {
-    const res = await fetch(`/api/match/${pid}`)
+    const metRes = await fetch(buildApiUrl(`/api/met/${pid}`))
+    if (!metRes.ok) throw new Error(`API error: ${metRes.status}`)
+    const metIds = await metRes.json()
+    const metIdsSet = new Set((metIds || []).map(String))
+
+    const res = await fetch(buildMatchApiUrl(`/api/match/${pid}`))
     if (!res.ok) throw new Error(`API error: ${res.status}`)
     const data = await res.json()
 
-    const metIds = loadMetIds()
     const raw = normalizeResponse(data)
 
     allMetMatches.value = raw
@@ -185,17 +193,13 @@ async function fetchMetMatches() {
         id: r?.id,
         name: r?.name ?? '',
         match_name: r?.match_name ?? null,
-
         role: r?.role ?? '',
-
-        // ✅ תיקון חשוב: לשמור את כל השפות
         whyMatched: r?.reason ?? '',
         whyMatched_en: r?.reason_en ?? '',
         whyMatched_he: r?.reason_he ?? '',
-
-        avatar: r?.imageUrl || placeholderAvatar,
+        avatar: (r?.imageUrl && String(r.imageUrl).trim()) ? r.imageUrl : placeholderAvatar,
       }))
-      .filter(m => metIds.has(String(m.id)))
+      .filter(m => metIdsSet.has(String(m.id)))
   } catch {
     allMetMatches.value = []
   }
@@ -203,189 +207,322 @@ async function fetchMetMatches() {
 
 onMounted(fetchMetMatches)
 
-// אם עוברים למשתמש אחר (route param משתנה) – טוענים מחדש
 watch(() => route.params.id, () => fetchMetMatches())
-
-// ✅ חשוב: כשמחליפים שפה – טוענים מחדש כדי לקבל reason בשפה הנכונה (אם השרת מחזיר לפי שפה)
 watch(lang, () => fetchMetMatches())
 
 const metMatches = computed(() => allMetMatches.value)
 
-function unmarkMet(m) {
-  const ids = loadMetIds()
-  ids.delete(String(m.id))
-  localStorage.setItem(metKey(), JSON.stringify([...ids]))
+async function unmarkMet(m) {
+  const pid = participantId()
 
-  // להסיר מיד מהמסך
+  await fetch(buildApiUrl('/api/met'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      userId: pid,
+      targetId: String(m.id),
+      remove: true
+    })
+  })
+
   allMetMatches.value = allMetMatches.value.filter(x => String(x.id) !== String(m.id))
+}
+
+function onAvatarError(e) {
+  e.target.src = placeholderAvatar
 }
 </script>
 
 <style scoped>
-.container { width: 100%; padding: 0; margin: 0; }
-
-.shell {
+.matches-page {
   min-height: 100vh;
-  padding: 18px 16px 70px;
+  background: #f5f6f4;
+  color: #45545a;
   font-family: Arial, sans-serif;
-  color: var(--h-text);
-
-  /* ✅ אותו רקע כמו LOGIN */
-  background: linear-gradient(
-    180deg,
-    #e6f2ec 0%,
-    #d6e8df 55%,
-    #c8ded3 100%
-  );
-
-  position: relative;
-  overflow: hidden;
 }
 
-/* blobs (צבעים בלבד) */
-.blob { position:absolute; filter: blur(18px); opacity:.55; border-radius:999px; pointer-events:none; }
-.blob1 { width:360px; height:360px; left:-140px; top:-140px;
-  background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--h-page-bg-mid) 55%, transparent), rgba(63,127,99,0.08));}
-.blob2 { width:460px; height:460px; right:-210px; top:50px;
-  background: radial-gradient(circle at 40% 40%, color-mix(in srgb, var(--h-page-bg-start) 35%, transparent), rgba(233,243,238,0.14));}
-.blob3 { width:420px; height:420px; left:50%; bottom:-250px; transform: translateX(-50%);
-  background: radial-gradient(circle at 40% 40%, rgba(233,243,238,0.80), color-mix(in srgb, var(--h-page-bg-start) 6%, transparent));}
-
-.page{ max-width: 980px; margin: 0 auto; }
-
-.headerRow{
-  display:flex; justify-content:space-between; align-items:flex-end;
-  gap:14px; margin: 8px 0 18px;
-}
-.h1{ margin:0 0 6px; font-size:44px; letter-spacing:-0.8px; font-weight:900; color: var(--h-green-700); }
-.subtitle{ margin:0; color: var(--h-text-muted); }
-
-/* language */
-.langBox{
-  display:flex; align-items:center; gap:8px;
-  padding: 10px 12px; border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.40));
-  border: 1px solid var(--h-border);
-  box-shadow: var(--h-shadow-soft);
-  backdrop-filter: blur(10px);
-}
-.langIcon{ opacity:0.8; }
-.langSelect{ border:none; outline:none; background:transparent; font-weight:800; color: var(--h-text); cursor:pointer; }
-
-.list{ display:grid; gap: 12px; grid-template-columns: 1fr; }
-@media (min-width: 900px){ .list{ grid-template-columns: 1fr 1fr; } }
-
-.card{
-  position:relative;
-  border-radius: 18px;
-  padding: 18px;
-  overflow:hidden;
-
-  /* ✅ כרטיס דרך טוקנים */
-  background: var(--h-card-bg);
-  border: 2.5px solid #2f6b4f;
-
-  box-shadow: var(--h-shadow-soft);
-  backdrop-filter: blur(10px);
-}
-.cardGlow{
-  position:absolute; inset:-2px;
-  background: radial-gradient(700px 240px at 15% 0%, rgba(63,127,99,0.16), transparent 60%);
-  pointer-events:none;
+.matches-wrap {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 18px 18px 40px;
 }
 
-.cardHeader{ display:flex; justify-content:space-between; align-items:flex-start; gap: 14px; }
-.info{ min-width:0; }
-.name{ font-size:22px; font-weight:900; margin-bottom:2px; color: var(--h-text); }
-.role{ color: var(--h-text-muted); }
-
-.avatar{
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid rgba(255,255,255,0.92);
-  box-shadow: 0 14px 30px rgba(31,63,50,0.18), 0 0 0 3px rgba(207,227,216,0.70);
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #d9ddd9;
 }
 
-.why{
-  margin: 12px 0 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(233,243,238,0.65);
-  border: 1px solid var(--h-border);
-  color: var(--h-text);
+:dir(rtl) .page-head {
+  text-align: right;
+}
+
+.title-box {
+  min-width: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 500;
+  color: #4e5d63;
+}
+
+.page-subtitle {
+  margin: 6px 0 0;
   font-size: 14px;
-  line-height: 1.35;
+  color: #9aa5aa;
+  font-weight: 600;
 }
-.why strong{ color: var(--h-green-800); }
 
-.actions{ display:flex; gap:8px; flex-wrap:wrap; }
+.language-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8f8f6;
+  border: 1px solid #d7dbd6;
+  border-radius: 999px;
+  padding: 7px 12px;
+  flex-shrink: 0;
+}
 
-/* ✅ כפתור: “חיזוק + מסגרת ירוקה חזקה” כמו בלוגין */
-.btn{
-  padding: 10px 14px;
+.language-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.language-select {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 14px;
+  color: #5a666b;
+  cursor: pointer;
+}
+
+.matches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.match-card {
+  background: #ffffff;
+  border: 1px solid #d8ddd8;
+  border-radius: 16px;
+  padding: 18px 18px 14px;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.06);
+}
+
+.match-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+:dir(rtl) .match-top {
+  flex-direction: row-reverse;
+}
+
+.match-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+:dir(rtl) .name-row {
+  justify-content: flex-start;
+}
+
+.match-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #4f5f65;
+}
+
+.why-section {
+  text-align: start;
+}
+
+.why-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6c8778;
+}
+
+.why-text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #5c6a6f;
+  word-break: break-word;
+}
+
+.avatar-side {
+  width: 132px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.match-avatar {
+  width: 92px;
+  height: 92px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 4px solid #f2f2ef;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.15);
+}
+
+.status-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e3e7e2;
+}
+
+.status-pill {
+  background: #f3f6f3;
+  border: 1px solid #d7ddd8;
+  color: #536268;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.actions-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+  border-top: 1px solid #e3e7e2;
+  padding-top: 12px;
+  gap: 0;
+}
+
+.single-action {
+  justify-content: flex-start;
+}
+
+:dir(rtl) .single-action {
+  justify-content: flex-end;
+}
+
+.action-btn {
+  min-width: 140px;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid #cfd6cf;
+  background: #ffffff;
+  color: #58666b;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.met-btn {
+  background: #fafaf8;
+}
+
+.action-btn:hover {
+  background: #eef3ee;
+}
+
+.state-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #d8ddd8;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.05);
+}
+
+.state-icon {
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
-
-  border: 2.5px solid #2f6b4f;
-  background: rgba(233, 243, 238, 0.85);
-  color: #1f3f32;
-
-  font-weight: 800;
-}
-.btn:hover{
-  border-color: #24513f;
-  background: rgba(233, 243, 238, 1);
-}
-
-/* outline: נשאר לבן עם מסגרת ירוקה חזקה */
-/* Skip – SAME as Save (green border + light green bg) */
-.btnOutline{
-  padding: 10px 14px;
-  border-radius: 12px;
-
-  border: 2.5px solid #2f6b4f;
-  background: rgba(233, 243, 238, 0.85);
-  color: #1f3f32;
-
-  font-weight: 800;
-}
-
-.btnOutline:hover{
-  border-color: #24513f;
-  background: rgba(233, 243, 238, 1);
-}
-
-.empty{
-  display:flex; gap:14px; align-items:center;
-  padding: 18px; border-radius: 18px;
-
-  /* ✅ דרך טוקנים */
-  background: var(--h-card-bg);
-  border: 1px dashed var(--h-border-strong);
-
-  box-shadow: var(--h-shadow-soft);
-  backdrop-filter: blur(10px);
-}
-.emptyIcon{
-  width:44px; height:44px; border-radius:14px;
-  display:grid; place-items:center;
-  background: var(--h-btn-bg);
-  border: 1px solid var(--h-border);
+  display: grid;
+  place-items: center;
+  background: #eef3ee;
   font-size: 18px;
 }
-.emptyTitle{ font-weight:900; color: var(--h-text); }
-.emptySub{ margin-top:2px; color: var(--h-text-muted); font-size:13px; }
 
-.spacerBottom{ height: 10px; }
+.state-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #506066;
+}
 
-@media (max-width: 420px){
-  .shell{ padding: 12px 10px 60px; }
-  .h1{ font-size: 34px; }
-  .card{ padding: 12px; border-radius: 16px; }
-  .name{ font-size: 19px; }
-  .avatar{ width: 86px; height: 86px; }
-  .why{ padding: 10px 12px; font-size: 13px; border-radius: 12px; }
-  .btn{ padding: 9px 12px; font-size: 13px; }
+.state-sub {
+  margin-top: 4px;
+  font-size: 14px;
+  color: #6f7d82;
+}
+
+@media (max-width: 700px) {
+  .matches-wrap {
+    padding: 14px 12px 30px;
+  }
+
+  .page-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .language-box {
+    align-self: flex-start;
+  }
+
+  :dir(rtl) .language-box {
+    align-self: flex-end;
+  }
+
+  .match-top {
+    gap: 12px;
+  }
+
+  .avatar-side {
+    width: 104px;
+  }
+
+  .match-avatar {
+    width: 78px;
+    height: 78px;
+  }
+
+  .match-name {
+    font-size: 17px;
+  }
+
+  .why-text {
+    font-size: 14px;
+  }
+
+  .action-btn {
+    min-width: 120px;
+    font-size: 14px;
+  }
 }
 </style>

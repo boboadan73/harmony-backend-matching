@@ -1,124 +1,144 @@
 <template>
-  <div class="container">
-    <div class="shell" :dir="isRtl ? 'rtl' : 'ltr'">
-      <!-- background decorations -->
-      <div class="blob blob1" aria-hidden="true"></div>
-      <div class="blob blob2" aria-hidden="true"></div>
-      <div class="blob blob3" aria-hidden="true"></div>
+  <div class="matches-page" :dir="isRtl ? 'rtl' : 'ltr'">
+    <TopNav :lang="lang" :pid="participantId()" />
 
-      <div class="page">
-        <!-- אם TopNav אצלך תקין, תשאירי. אם זה גורם לקריסה, תמחקי את השורה הזו -->
-        <TopNav :lang="lang" />
-
-        <div class="headerRow">
-          <div class="titles">
-            <h1 class="h1">{{ t.title }}</h1>
-            <p class="subtitle">{{ t.subtitle }}</p>
-          </div>
-
-          <div class="langBox">
-            <span class="langIcon" aria-hidden="true">🌐</span>
-            <select class="langSelect" v-model="lang">
-              <option value="en">English</option>
-              <option value="ar">Arabic</option>
-              <option value="he">Hebrew</option>
-            </select>
-          </div>
+    <main class="matches-wrap">
+      <section class="page-head">
+        <div class="title-box">
+          <h1 class="page-title">{{ t.title }}</h1>
+          <p class="page-subtitle">{{ t.subtitle }}</p>
         </div>
+   
+<div class="head-actions">
+  <div class="filters-bar">
+    <button class="filters-toggle" @click="showFilters = !showFilters">
+      {{ t.filters }}
+    </button>
 
-        <!-- LOADING / ERROR -->
-        <div v-if="loading" class="empty">
-          <div class="emptyIcon" aria-hidden="true">⏳</div>
-          <div class="emptyText">
-            <div class="emptyTitle">{{ t.loadingTitle }}</div>
-            <div class="emptySub">{{ t.loadingSub }}</div>
-          </div>
+    <div v-if="showFilters" class="filters-dropdown">
+      <select v-model="filterType" class="filters-select">
+        <option value="name">{{ t.searchByName }}</option>
+        <option value="company">{{ t.searchByCompany }}</option>
+        <option value="skills">{{ t.filterBySkills }}</option>
+        <option value="interests">{{ t.filterByInterests }}</option>
+        <option value="languages">{{ t.filterByLanguages }}</option>
+      </select>
+
+      <input
+        v-model="filterValue"
+        class="filters-input"
+        type="text"
+        :placeholder="t.typeHere"
+      />
+
+      <div class="filters-actions">
+        <button class="filters-clear" @click="clearFilters">
+          {{ t.clearFilters }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="language-box">
+    <span class="language-icon" aria-hidden="true">🌐</span>
+    <select class="language-select" v-model="lang">
+      <option value="en">English</option>
+      <option value="ar">Arabic</option>
+      <option value="he">Hebrew</option>
+    </select>
+  </div>
+</div>
+      </section>
+
+      <div v-if="loading" class="state-box">
+        <div class="state-icon" aria-hidden="true">⏳</div>
+        <div>
+          <div class="state-title">{{ t.loadingTitle }}</div>
+          <div class="state-sub">{{ t.loadingSub }}</div>
         </div>
+      </div>
 
-        <div v-else-if="errorMsg" class="empty">
-          <div class="emptyIcon" aria-hidden="true">⚠️</div>
-          <div class="emptyText">
-            <div class="emptyTitle">{{ t.errorTitle }}</div>
-            <div class="emptySub">{{ errorMsg }}</div>
-          </div>
+      <div v-else-if="errorMsg" class="state-box">
+        <div class="state-icon" aria-hidden="true">⚠️</div>
+        <div>
+          <div class="state-title">{{ t.errorTitle }}</div>
+          <div class="state-sub">{{ errorMsg }}</div>
         </div>
+      </div>
 
-        <!-- EMPTY -->
-        <div v-else-if="sortedMatches.length === 0" class="empty">
-          <div class="emptyIcon" aria-hidden="true">✨</div>
-          <div class="emptyText">
-            <div class="emptyTitle">{{ t.emptyTitle }}</div>
-            <div class="emptySub">{{ t.emptySub }}</div>
-          </div>
+<div v-else-if="filteredMatches.length === 0" 
+class="state-box">
+          <div class="state-icon" aria-hidden="true">✨</div>
+        <div>
+          <div class="state-title">{{ t.emptyTitle }}</div>
+          <div class="state-sub">{{ t.emptySub }}</div>
         </div>
+      </div>
 
-        <!-- LIST -->
-        <div v-else class="list">
-          <div
-            v-for="(m, idx) in sortedMatches"
-            :key="m.id"
-            class="card"
-            :class="{ topMatch: idx === 0 }"
-          >
-            <div class="cardGlow" aria-hidden="true"></div>
+      <section v-else class="matches-list">
+        <article
+v-for="(m, idx) in filteredMatches"
+          :key="m.id"
+          class="match-card"
+        >
+          <div class="match-top">
+            <div class="match-main">
+              <div class="name-row">
+                <h2 class="match-name">{{ getName(m) }}</h2>
 
-            <div v-if="idx === 0" class="bestBadge">
-              {{ t.bestMatch }}
-            </div>
-
-            <div class="cardHeader">
-              <div class="info">
-                <!-- ✅ שינוי: במקום m.name -->
-                <div class="name">{{ getName(m) }}</div>
-
-                <div class="role">{{ m.role }}</div>
-
-                <div class="matchPercent ltrNum">
-                  {{ m.matchPercent }}% {{ t.matchSuffix }}
-                </div>
+                <span v-if="idx === 0" class="best-badge">
+                  {{ t.bestMatch }}
+                </span>
               </div>
 
+              <div v-if="getWhy(m)" class="why-section">
+                <div class="why-title">{{ t.why }}</div>
+                <div class="why-text">{{ getWhy(m) }}</div>
+              </div>
+            </div>
+
+            <div class="avatar-side">
               <img
-                class="avatar"
+                class="match-avatar"
                 :src="m.avatar"
                 alt="avatar"
                 loading="lazy"
                 @error="onAvatarError"
               />
-            </div>
 
-            <div class="why">
-              <strong>{{ t.why }}</strong>
-              <!-- ✅ כבר אצלך: שינוי יחיד בטמפלייט: במקום m.whyMatched -->
-              {{ getWhy(m) }}
-            </div>
-
-            <div class="status">
-              <span v-if="m.saved">{{ t.saved }}</span>
-              <span v-if="m.met">{{ t.met }}</span>
-            </div>
-
-            <div class="actions">
-              <button class="btn" @click="save(m)">
-                {{ m.saved ? t.unsave : t.save }}
-              </button>
-
-              <button class="btn btnDark" @click="markMet(m)">
-                {{ m.met ? t.unmetBtn : t.metBtn }}
-              </button>
-
-              <button class="btn btnOutline" @click="skip(m)">
-                {{ t.skip }}
-              </button>
+              <div class="match-score ltrNum">
+                {{ m.matchPercent }}% {{ t.matchSuffix }}
+              </div>
             </div>
           </div>
 
-          <div class="refreshRow">
-            <button class="btn" @click="fetchMatches()">{{ t.refresh }}</button>
+          <div v-if="m.saved || m.met" class="status-row">
+            <span v-if="m.saved" class="status-pill">{{ t.saved }}</span>
+            <span v-if="m.met" class="status-pill">{{ t.met }}</span>
           </div>
+
+          <div class="actions-row">
+            <button class="action-btn save-btn" @click="save(m)">
+              {{ m.saved ? t.unsave : t.save }}
+            </button>
+
+            <button class="action-btn met-btn" @click="markMet(m)">
+              {{ m.met ? t.unmetBtn : t.metBtn }}
+            </button>
+
+            <button class="action-btn skip-btn" @click="skip(m)">
+              {{ t.skip }}
+            </button>
+          </div>
+        </article>
+
+        <div class="refresh-row">
+          <button class="refresh-btn" @click="fetchMatches()">
+            {{ t.refresh }}
+          </button>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   </div>
 </template>
 
@@ -126,25 +146,29 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TopNav from '@/components/TopNav.vue'
+import { buildApiUrl, buildMatchApiUrl } from '@/services/api'
+import defaultAvatar from '@/assets/default-avatar.png'
 
 const route = useRoute()
+const showFilters = ref(false)
 
-/* ===== Language ===== */
+const filterType = ref('name') // name | company | skills | interests | languages
+const filterValue = ref('')
 const LANG_KEY = 'harmony_lang'
 const lang = ref(localStorage.getItem(LANG_KEY) || 'en')
+
+
 watch(
   lang,
   (v, prev) => {
     localStorage.setItem(LANG_KEY, v)
 
-    // ✅ אם השפה השתנתה בפועל — רענני נתונים כדי לקבל reason בשפה החדשה
     if (v !== prev) {
       fetchMatches()
     }
   },
   { immediate: true }
 )
-
 
 const TEXTS = {
   en: {
@@ -164,8 +188,19 @@ const TEXTS = {
     unmetBtn: 'Unmet',
     skip: 'Skip',
     matchSuffix: 'match',
-    bestMatch: '⭐ BEST MATCH',
+    bestMatch: 'BEST MATCH',
     refresh: 'Refresh',
+    filtersTitle: 'Filters',
+    searchByName: 'Search by name',
+    searchByCompany: 'Search by company',
+    filterBySkills: 'Filter by skills',
+    filterByInterests: 'Filter by interests',
+    filterByLanguages: 'Filter by languages',
+    clearFilters: 'Clear all filters',
+    filters: 'Filters',
+typeHere: 'Type here...',
+    
+    
   },
   ar: {
     title: 'المطابقات',
@@ -184,8 +219,17 @@ const TEXTS = {
     unmetBtn: 'إلغاء تم اللقاء',
     skip: 'تخطي',
     matchSuffix: 'تطابق',
-    bestMatch: '⭐ أفضل تطابق',
+    bestMatch: 'أفضل تطابق',
     refresh: 'تحديث',
+    filtersTitle: 'عوامل التصفية',
+    searchByName: 'ابحث بالاسم',
+    searchByCompany: 'ابحث بالشركة',
+    filterBySkills: 'تصفية حسب المهارات',
+    filterByInterests: 'تصفية حسب الاهتمامات',
+    filterByLanguages: 'تصفية حسب اللغات',
+    clearFilters: 'مسح جميع عوامل التصفية',
+    filters: 'عوامل التصفية',
+typeHere: 'اكتب هنا...',
   },
   he: {
     title: 'התאמות',
@@ -204,54 +248,32 @@ const TEXTS = {
     unmetBtn: 'בטל נפגשנו',
     skip: 'דלג',
     matchSuffix: 'התאמה',
-    bestMatch: '⭐ ההתאמה הטובה ביותר',
+    bestMatch: 'ההתאמה הטובה ביותר',
     refresh: 'רענן',
+    filtersTitle: 'סינון',
+    searchByName: 'חיפוש לפי שם',
+    searchByCompany: 'חיפוש לפי חברה',
+    filterBySkills: 'סינון לפי כישורים',
+    filterByInterests: 'סינון לפי תחומי עניין',
+    filterByLanguages: 'סינון לפי שפות',
+    clearFilters: 'נקה את כל הסינונים',
+    filters: 'סינון',
+typeHere: 'הקלד/י כאן...',
   },
 }
 
 const t = computed(() => TEXTS[lang.value] ?? TEXTS.en)
 const isRtl = computed(() => lang.value === 'ar' || lang.value === 'he')
 
-/* ===== Data ===== */
 const loading = ref(false)
 const errorMsg = ref('')
 const matches = ref([])
 
-import defaultAvatar from '@/assets/default-avatar.png'
+
 const placeholderAvatar = defaultAvatar
 
 function participantId() {
   return String(route.params.id || '').trim()
-}
-function savedKey() {
-  return `harmony_saved_${participantId()}`
-}
-function metKey() {
-  return `harmony_met_${participantId()}`
-}
-
-function loadSet(key) {
-  try {
-    const arr = JSON.parse(localStorage.getItem(key) || '[]')
-    return new Set(arr.map(String))
-  } catch {
-    return new Set()
-  }
-}
-
-function saveSet(key, setObj) {
-  localStorage.setItem(key, JSON.stringify([...setObj]))
-}
-
-function applySavedMetFlags(list) {
-  const saved = loadSet(savedKey())
-  const met = loadSet(metKey())
-
-  return list.map(x => ({
-    ...x,
-    saved: saved.has(String(x.id)),
-    met: met.has(String(x.id)),
-  }))
 }
 
 function normalizeResponse(data) {
@@ -259,19 +281,11 @@ function normalizeResponse(data) {
   if (data && Array.isArray(data.matches)) return data.matches
   return []
 }
-
-/* ✅ חדש: פונקציה שמחזירה reason לפי השפה (נשאר כמו אצלך – גם אם לא בשימוש) */
-function pickReasonByLang(raw) {
-  const ar = raw?.reason ?? ''
-  const en = raw?.reason_en ?? ''
-  const he = raw?.reason_he ?? ''
-
-  if (lang.value === 'en') return en || ar || he || ''
-  if (lang.value === 'he') return he || en || ar || ''
-  return ar || en || he || ''
+function clearFilters() {
+  filterType.value = 'name'
+  filterValue.value = ''
 }
 
-/* ✅ פונקציה ל-Why בהתאם לשפה */
 function getWhy(m) {
   if (!m) return ''
   if (lang.value === 'en') return m.whyMatched_en || m.whyMatched || m.whyMatched_he || ''
@@ -279,7 +293,6 @@ function getWhy(m) {
   return m.whyMatched || m.whyMatched_en || m.whyMatched_he || ''
 }
 
-/* ✅ חדש: פונקציה לשם בהתאם לשפה (לפי match_name מה-backend) */
 function getName(m) {
   if (!m) return ''
 
@@ -298,26 +311,22 @@ function toUiMatch(raw) {
   const matchPercent = Number.isFinite(score) ? Math.round(score * 100) : 0
 
   return {
-    id: raw?.id ?? Math.random().toString(16).slice(2),
-
-    name: raw?.name ?? '',
-
-    // ✅ הוספה בלבד: שומר את match_name שמגיע מה-API
-    match_name: raw?.match_name ?? null,
-
-    role: '', // לא מגיע מה-API כרגע
-    matchPercent,
-
-    // ✅ שמירה של כל השפות ל-why
-    whyMatched: raw?.reason ?? '',
-    whyMatched_en: raw?.reason_en ?? '',
-    whyMatched_he: raw?.reason_he ?? '',
-
-    avatar: (raw?.imageUrl && String(raw.imageUrl).trim()) ? raw.imageUrl : placeholderAvatar,
-
-    saved: false,
-    met: false,
-  }
+  id: raw?.id ?? Math.random().toString(16).slice(2),
+  name: raw?.name ?? '',
+  match_name: raw?.match_name ?? null,
+  role: '',
+  company: raw?.company ?? raw?.job ?? raw?.jobTitle ?? '',
+  skills: raw?.skills ?? raw?.professional ?? '',
+  interests: raw?.interests ?? raw?.personal ?? '',
+  languages: raw?.languages ?? '',
+  matchPercent,
+  whyMatched: raw?.reason ?? '',
+  whyMatched_en: raw?.reason_en ?? '',
+  whyMatched_he: raw?.reason_he ?? '',
+  avatar: (raw?.imageUrl && String(raw.imageUrl).trim()) ? raw.imageUrl : placeholderAvatar,
+  saved: false,
+  met: false,
+}
 }
 
 async function fetchMatches() {
@@ -328,15 +337,35 @@ async function fetchMatches() {
   errorMsg.value = ''
 
   try {
-    // ✅ עם proxy:
-    const res = await fetch(`/api/match/${pid}`)
-    if (!res.ok) throw new Error(`API error: ${res.status}`)
-    const data = await res.json()
+    const [matchRes, savedRes, metRes] = await Promise.all([
+      fetch(buildMatchApiUrl(`/api/match/${pid}`)),
+      fetch(buildApiUrl(`/api/saved/${pid}`)),
+      fetch(buildApiUrl(`/api/met/${pid}`)),
+    ])
 
-    const rawMatches = normalizeResponse(data)
+    if (!matchRes.ok) throw new Error(`API error: ${matchRes.status}`)
+    if (!savedRes.ok) throw new Error(`API error: ${savedRes.status}`)
+    if (!metRes.ok) throw new Error(`API error: ${metRes.status}`)
 
-    // ✅ אותו דבר שלך, רק הוספתי applySavedMetFlags (היה אצלך אבל לא השתמשת)
-    matches.value = applySavedMetFlags(rawMatches.map(toUiMatch))
+    const [matchData, savedIdsRaw, metIdsRaw] = await Promise.all([
+      matchRes.json(),
+      savedRes.json(),
+      metRes.json(),
+    ])
+
+    const savedIds = new Set((savedIdsRaw || []).map(String))
+    const metIds = new Set((metIdsRaw || []).map(String))
+
+    const rawMatches = normalizeResponse(matchData)
+
+    matches.value = rawMatches.map(raw => {
+      const m = toUiMatch(raw)
+      return {
+        ...m,
+        saved: savedIds.has(String(m.id)),
+        met: metIds.has(String(m.id)),
+      }
+    })
   } catch (e) {
     errorMsg.value = e?.message || 'Failed to fetch'
     matches.value = []
@@ -356,34 +385,82 @@ const sortedMatches = computed(() =>
   [...matches.value].sort((a, b) => (b.matchPercent ?? 0) - (a.matchPercent ?? 0))
 )
 
-function save(m) {
-  const key = savedKey()
-  const setObj = loadSet(key)
-  const id = String(m.id)
+const filteredMatches = computed(() => {
+  if (!filterValue.value) return sortedMatches.value
 
-  if (setObj.has(id)) {
-    setObj.delete(id)
-    m.saved = false
-  } else {
-    setObj.add(id)
-    m.saved = true
+  const q = filterValue.value.toLowerCase()
+
+  return sortedMatches.value.filter((m) => {
+    if (filterType.value === 'name') {
+      return getName(m).toLowerCase().includes(q)
+    }
+
+    if (filterType.value === 'company') {
+      return String(m.company || '').toLowerCase().includes(q)
+    }
+
+    if (filterType.value === 'skills') {
+      return String(m.skills || '').toLowerCase().includes(q)
+    }
+
+    if (filterType.value === 'interests') {
+      return String(m.interests || '').toLowerCase().includes(q)
+    }
+
+    if (filterType.value === 'languages') {
+      return String(m.languages || '').toLowerCase().includes(q)
+    }
+
+    return true
+  })
+})
+
+async function save(m) {
+  const pid = participantId()
+
+  try {
+    const res = await fetch(buildApiUrl('/api/save'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: pid,
+        targetId: String(m.id),
+        remove: !!m.saved,
+      })
+    })
+
+    if (!res.ok) throw new Error(`API error: ${res.status}`)
+
+    m.saved = !m.saved
+  } catch (e) {
+    errorMsg.value = e?.message || 'Save failed'
   }
-  saveSet(key, setObj)
 }
 
-function markMet(m) {
-  const key = metKey()
-  const setObj = loadSet(key)
-  const id = String(m.id)
+async function markMet(m) {
+  const pid = participantId()
 
-  if (setObj.has(id)) {
-    setObj.delete(id)
-    m.met = false
-  } else {
-    setObj.add(id)
-    m.met = true
+  try {
+    const res = await fetch(buildApiUrl('/api/met'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: pid,
+        targetId: String(m.id),
+        remove: !!m.met,
+      })
+    })
+
+    if (!res.ok) throw new Error(`API error: ${res.status}`)
+
+    m.met = !m.met
+  } catch (e) {
+    errorMsg.value = e?.message || 'Met failed'
   }
-  saveSet(key, setObj)
 }
 
 function skip(m) {
@@ -396,175 +473,477 @@ function onAvatarError(e) {
 </script>
 
 <style scoped>
-/* זה ה-CSS שלך 그대로 (רק הוספתי refreshRow). */
-.container { width: 100%; padding: 0; margin: 0; }
-
-.shell {
+.matches-page {
   min-height: 100vh;
-  padding: 18px 16px 70px;
+  background: #f5f6f4;
+  color: #45545a;
   font-family: Arial, sans-serif;
-  color: var(--h-text);
-  background: linear-gradient(180deg, #e6f2ec 0%, #d6e8df 55%, #c8ded3 100%);
+}
+
+.matches-wrap {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 18px 18px 40px;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #d9ddd9;
+}
+
+
+
+:dir(rtl) .page-head {
+  text-align: right;
+}
+
+.title-box {
+  min-width: 0;
+}
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-inline-start: auto;
   position: relative;
-  overflow: hidden;
 }
 
-.blob { position:absolute; filter: blur(18px); opacity:.55; border-radius:999px; pointer-events:none; }
-.blob1 { width:360px; height:360px; left:-140px; top:-140px;
-  background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--h-page-bg-mid) 55%, transparent), rgba(63,127,99,0.08));}
-.blob2 { width:460px; height:460px; right:-210px; top:50px;
-  background: radial-gradient(circle at 40% 40%, color-mix(in srgb, var(--h-page-bg-start) 35%, transparent), rgba(233,243,238,0.14));}
-.blob3 { width:420px; height:420px; left:50%; bottom:-250px; transform: translateX(-50%);
-  background: radial-gradient(circle at 40% 40%, rgba(233,243,238,0.80), color-mix(in srgb, var(--h-page-bg-start) 6%, transparent));}
-
-.page { max-width: 980px; margin: 0 auto; }
-
-.headerRow { display:flex; justify-content:space-between; align-items:flex-end; gap:14px; margin: 8px 0 18px; }
-.h1 { margin:0 0 6px; font-size:44px; letter-spacing:-0.8px; font-weight:900; color: var(--h-green-700); }
-.subtitle { margin:0; color: var(--h-text-muted); }
-
-.langBox {
-  display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.40));
-  border: 1px solid var(--h-border);
-  box-shadow: var(--h-shadow-soft);
-  backdrop-filter: blur(10px);
+:dir(rtl) .head-actions {
+  flex-direction: row-reverse;
 }
 
-.list { display:grid; gap:12px; grid-template-columns:1fr; }
-@media (min-width: 900px){ .list{ grid-template-columns: 1fr 1fr; } }
-
-.card {
-  position: relative; border-radius: 18px; padding: 16px; overflow: hidden;
-  background: var(--h-card-bg); border: 2.5px solid #2f6b4f;
-  box-shadow: var(--h-shadow-soft); backdrop-filter: blur(10px);
-  transition:
-   transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-}
-.card > * { position: relative; z-index: 1; }
-
-.card:hover { transform: translateY(-2px); border-color:  #24513f; box-shadow: 0 18px 45px rgba(31, 63, 50, 0.16); }
-
-.cardGlow{ position:absolute; inset:-2px; background: radial-gradient(700px 240px at 15% 0%, rgba(63,127,99,0.18), transparent 60%); pointer-events:none; }
-
-/* ⭐ Best match: highlight the whole card */
-.topMatch{
-  border-color: #1e5a43;
-  box-shadow: 0 22px 60px rgba(31,63,50,0.22);
+.page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 500;
+  color: #4e5d63;
 }
 
-.topMatch::before{
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-  pointer-events: none;
-
-  /* glow + subtle fill on the whole card */
-  background:
-    radial-gradient(900px 320px at 20% 0%, rgba(79,154,120,0.18), transparent 60%),
-    linear-gradient(180deg, rgba(233,243,238,0.35), rgba(233,243,238,0.08));
+.page-subtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: #9aa5aa;
+  font-weight: 600;
 }
 
-/* ⭐ BEST MATCH – fixed top corner, no overlap, no height change */
-.bestBadge{
-  position: absolute;
-  top: 8px;          /* בתוך הכרטיס, לא שלילי */
-  right: 12px;       /* פינה ימנית */
-  left: auto;
-
-  padding: 6px 14px;
+.language-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8f8f6;
+  border: 1px solid #d7dbd6;
   border-radius: 999px;
+  padding: 7px 12px;
+  flex-shrink: 0;
+}
 
-  background: linear-gradient(90deg, #2f6b4f, #4a8a6d);
+.language-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.language-select {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 14px;
+  color: #5a666b;
+  cursor: pointer;
+}
+.filters-bar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.filters-toggle {
+  border: 1px solid #cfd6cf;
+  background: #ffffff;
+  color: #56656a;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filters-toggle:hover {
+  background: #eef3ee;
+}
+
+.filters-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 320px;
+  background: #ffffff;
+  border: 1px solid #d8ddd8;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+  box-sizing: border-box;
+}
+
+:dir(rtl) .filters-dropdown {
+  left: auto;
+  right: 0;
+}
+
+.filters-select,
+.filters-input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 42px;
+  border: 1px solid #d3d9d3;
+  border-radius: 12px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: #4f5f65;
+  background: #fafbf9;
+  margin-bottom: 10px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.filters-select:focus,
+.filters-input:focus {
+  border-color: #8fb89c;
+  background: #ffffff;
+}
+
+.filters-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.filters-clear {
+  border: 1px solid #cfd6cf;
+  background: #ffffff;
+  color: #56656a;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filters-clear:hover {
+  background: #eef3ee;
+}
+.matches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.match-card {
+  background: #ffffff;
+  border: 1px solid #d8ddd8;
+  border-radius: 16px;
+  padding: 18px 18px 14px;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.06);
+}
+
+.match-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+:dir(rtl) .match-top {
+  flex-direction: row-reverse;
+}
+
+.match-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+:dir(rtl) .name-row {
+  justify-content: flex-start;
+}
+
+.match-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #4f5f65;
+}
+
+.best-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #8fb89c;
   color: #ffffff;
-
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.4px;
-
-  border: 1.5px solid #2f6b4f;
-  box-shadow: 0 10px 28px rgba(31,63,50,0.28);
-
-  z-index: 5;
-  white-space: nowrap;   /* מונע שבירת טקסט */
-  max-width: 90%; 
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
-
-
-/* ⭐ RTL – move badge to the right side */
-:dir(rtl) .bestBadge{
-  left: 12px;
-  right: auto;
-  direction: rtl;
-  text-align: center;
+.why-section {
+  text-align: start;
 }
 
-
-.cardHeader { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
-.name { font-size:24px; font-weight:900; color: var(--h-text); margin-bottom:2px; }
-.role { color: var(--h-text-muted); margin-bottom:10px; }
-
-.matchPercent{
-  display: inline-flex; align-items: center; gap: 8px; width: fit-content;
-  padding: 6px 12px; border-radius: 999px;
-  background: rgba(233, 243, 238, 0.85);
-  border: 2px solid #2f6b4f;
-  color: #1f3f32; font-weight: 900; font-size: 13px;
-}
-.ltrNum { direction:ltr; unicode-bidi: plaintext; }
-.matchPercent::before{
-  content:""; width:8px; height:8px; border-radius:999px;
-  background: var(--h-green-600);
-  box-shadow: 0 0 0 4px rgba(79,154,120,0.16);
+.why-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6c8778;
 }
 
-.avatar{
-  width:130px; height:130px; object-fit:cover;
-  border: 3px solid rgba(255,255,255,0.90);
+.why-text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #5c6a6f;
+  word-break: break-word;
+}
+
+.avatar-side {
+  width: 132px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.match-avatar {
+  width: 92px;
+  height: 92px;
+  object-fit: cover;
   border-radius: 50%;
-  box-shadow: 0 14px 30px rgba(31,63,50,0.18), 0 0 0 3px rgba(207,227,216,0.70);
+  border: 4px solid #f2f2ef;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.15);
 }
 
-.why{
-  margin: 12px 0; padding: 10px 12px; border-radius: 12px;
-  background: var(--h-soft-2); border: 1px solid var(--h-border);
-  font-size: 14px; line-height: 1.35;
+.match-score {
+  margin-top: -8px;
+  background: #6f9979;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.16);
 }
-.why strong{ color: var(--h-green-800); }
 
-.status{ margin-bottom:12px; display:flex; gap:10px; flex-wrap:wrap; color: var(--h-text); }
-.status span{
-  background: rgba(233,243,238,0.60); border: 1px solid var(--h-border);
-  padding:6px 10px; border-radius:999px; font-size:13px;
+.ltrNum {
+  direction: ltr;
+  unicode-bidi: embed;
 }
 
-.actions{ display:flex; gap:8px; flex-wrap:wrap; }
-
-.btn{
-  padding: 10px 14px; border-radius: 12px;
-  border: 2.5px solid #2f6b4f;
-  background: rgba(233, 243, 238, 0.85);
-  color: #1f3f32;
-  font-weight: 800;
+.status-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e3e7e2;
 }
-.btn:hover{ border-color: #24513f; background: rgba(233, 243, 238, 1); }
 
-.btnDark{ font-weight: 900; letter-spacing: 0.3px; }
-.btnOutline{ font-weight: 800; }
-
-.empty{
-  display:flex; gap:14px; align-items:center; padding: 18px; border-radius: 18px;
-  background: var(--h-card-bg); border: 1px dashed var(--h-border-strong);
-  box-shadow: var(--h-shadow-soft); backdrop-filter: blur(10px);
+.status-pill {
+  background: #f3f6f3;
+  border: 1px solid #d7ddd8;
+  color: #536268;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 600;
 }
-.emptyIcon{
-  width:44px; height:44px; border-radius:14px; display:grid; place-items:center;
-  background: var(--h-btn-bg); border: 1px solid var(--h-border); font-size: 18px;
-}
-.emptyTitle{ font-weight:900; color: var(--h-text); }
-.emptySub{ margin-top:2px; color: var(--h-text-muted); font-size:13px; }
 
-.refreshRow{ margin-top: 12px; display:flex; justify-content:center; }
+.actions-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+  border-top: 1px solid #e3e7e2;
+  padding-top: 12px;
+  gap: 0;
+}
+
+.action-btn {
+  min-width: 96px;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid #cfd6cf;
+  background: #ffffff;
+  color: #58666b;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action-btn:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.action-btn:last-child {
+  border-radius: 0 999px 999px 0;
+}
+
+:dir(rtl) .action-btn:first-child {
+  border-radius: 0 999px 999px 0;
+}
+
+:dir(rtl) .action-btn:last-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.action-btn + .action-btn {
+  border-inline-start: 0;
+}
+
+.save-btn {
+  background: #dfe9df;
+}
+
+.met-btn,
+.skip-btn {
+  background: #fafaf8;
+}
+
+.action-btn:hover {
+  background: #eef3ee;
+}
+
+.refresh-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.refresh-btn {
+  border: 1px solid #cfd6cf;
+  background: #ffffff;
+  color: #56656a;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refresh-btn:hover {
+  background: #eef3ee;
+}
+
+.state-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #d8ddd8;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.05);
+}
+
+.state-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #eef3ee;
+  font-size: 18px;
+}
+
+.state-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #506066;
+}
+
+.state-sub {
+  margin-top: 4px;
+  font-size: 14px;
+  color: #6f7d82;
+}
+
+@media (max-width: 700px) {
+  .matches-wrap {
+    padding: 14px 12px 30px;
+  }
+
+  .page-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .language-box {
+    align-self: flex-start;
+  }
+
+  :dir(rtl) .language-box {
+    align-self: flex-end;
+  }
+
+  .match-top {
+    gap: 12px;
+  }
+
+  .avatar-side {
+    width: 104px;
+  }
+
+  .match-avatar {
+    width: 78px;
+    height: 78px;
+  }
+
+  .match-score {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .match-name {
+    font-size: 17px;
+  }
+
+  .why-text {
+    font-size: 14px;
+  }
+
+  .action-btn {
+    min-width: 82px;
+    font-size: 14px;
+  }
+    .head-actions {
+    width: 100%;
+    justify-content: space-between;
+    margin-inline-start: 0;
+  }
+
+  .filters-dropdown {
+    width: 100%;
+    min-width: 260px;
+    left: 0;
+    right: auto;
+  }
+
+  :dir(rtl) .filters-dropdown {
+    right: 0;
+    left: auto;
+  }
+}
 </style>

@@ -1,7 +1,8 @@
 <template>
-  <button @click="logout">
-  {{ TEXTS[lang].logout }}
-</button>
+  <button class="logoutBtn" @click="logout">
+    {{ t.logout }}
+  </button>
+
   <header class="topNav" :dir="isRtl ? 'rtl' : 'ltr'">
     <!-- Hamburger -->
     <button class="menuBtn" type="button" @click="open = true" aria-label="Open menu">
@@ -17,7 +18,6 @@
 
     <!-- spacer -->
     <div class="spacer"></div>
-    
 
     <!-- Overlay + Drawer -->
     <div v-if="open" class="overlay" @click.self="open = false">
@@ -27,25 +27,23 @@
           <button class="closeBtn" @click="open = false" aria-label="Close menu">✕</button>
         </div>
 
-<nav class="drawerNav">
-  <router-link :to="pidStr ? `/matches/${pidStr}` : '/login'" class="item" @click="open = false">
-    {{ t.matches }}
-  </router-link>
+        <nav class="drawerNav">
+          <router-link :to="pidStr ? `/matches/${pidStr}` : '/login'" class="item" @click="open = false">
+            {{ t.matches }}
+          </router-link>
 
-  <router-link :to="pidStr ? `/profile/${pidStr}` : '/login'" class="item" @click="open = false">
-    {{ t.profile }}
-  </router-link>
+          <router-link :to="pidStr ? `/profile/${pidStr}` : '/login'" class="item" @click="open = false">
+            {{ t.profile }}
+          </router-link>
 
-  <router-link :to="pidStr ? `/met/${pidStr}` : '/login'" class="item" @click="open = false">
-    {{ t.met }}
-  </router-link>
+          <router-link :to="pidStr ? `/met/${pidStr}` : '/login'" class="item" @click="open = false">
+            {{ t.met }}
+          </router-link>
 
-  <router-link :to="pidStr ? `/saved/${pidStr}` : '/login'" class="item" @click="open = false">
-    {{ t.saved }}
-  </router-link>
-</nav>
-
-
+          <router-link :to="pidStr ? `/saved/${pidStr}` : '/login'" class="item" @click="open = false">
+            {{ t.saved }}
+          </router-link>
+        </nav>
       </aside>
     </div>
   </header>
@@ -53,45 +51,32 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import logoSrc from '../assets/harmony-logo.png'
-
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
-function logout() {
-  localStorage.removeItem('harmony_pid')
-  router.push('/login')
-}
-const TEXTS = {
-  en: {
-    logout: 'Logout'
-  },
-  he: {
-    logout: 'התנתק'
-  },
-  ar: {
-    logout: 'تسجيل الخروج'
-  }
-}
 
 const props = defineProps({
   lang: { type: String, default: 'en' },
+  pid: { type: [String, Number], default: '' },
 })
 
 const route = useRoute()
+const router = useRouter()
 const open = ref(false)
+
+function logout() {
+  localStorage.removeItem('harmony_pid')
+  open.value = false
+  router.push('/login')
+}
 
 const isRtl = computed(() => props.lang === 'he' || props.lang === 'ar')
 
 const pidStr = computed(() => {
-  // קודם מה-URL, ואם אין – מה-localStorage
-  const pid = String(route.params.id || localStorage.getItem('harmony_pid') || '').trim()
+  const pid =
+    String(props.pid || route.params.id || localStorage.getItem('harmony_pid') || '').trim()
   return pid
 })
 
-// אם יש pid ב-URL – נשמור אותו תמיד
 watch(
   () => route.params.id,
   (v) => {
@@ -102,18 +87,53 @@ watch(
 )
 
 const t = computed(() => {
-  if (props.lang === 'he')
-    return { matches: 'התאמות', profile: 'פרופיל', met: 'נפגשנו', saved: 'שמורים' }
-  if (props.lang === 'ar')
-    return { matches: 'المطابقات', profile: 'الملف الشخصي', met: 'تم اللقاء', saved: 'المحفوظات' }
-  return { matches: 'Matches', profile: 'Profile', met: 'Met', saved: 'Saved' }
+  if (props.lang === 'he') {
+    return {
+      matches: 'התאמות',
+      profile: 'פרופיל',
+      met: 'נפגשנו',
+      saved: 'שמורים',
+      logout: 'התנתק',
+    }
+  }
+
+  if (props.lang === 'ar') {
+    return {
+      matches: 'المطابقات',
+      profile: 'الملف الشخصي',
+      met: 'تم اللقاء',
+      saved: 'المحفوظات',
+      logout: 'تسجيل الخروج',
+    }
+  }
+
+  return {
+    matches: 'Matches',
+    profile: 'Profile',
+    met: 'Met',
+    saved: 'Saved',
+    logout: 'Logout',
+  }
 })
 </script>
-
 
 <style scoped>
 /* NAV */
 
+.logoutBtn{
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2px solid #2f6b4f;
+  background: rgba(233,243,238,0.95);
+  color: #1f3f32;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.logoutBtn:hover{
+  background: #ffffff;
+}
 
 .topNav{
   position: sticky;
@@ -186,17 +206,17 @@ const t = computed(() => {
 /* spacer */
 .spacer{ width:56px; height:44px; }
 
-/* ✅ Overlay מאחורה (כהה ויפה) */
+/* Overlay */
 .overlay{
   position: fixed;
   inset: 0;
-  background: rgba(15, 25, 20, 0.70); /* פחות שקוף, יותר "סוגר" */
+  background: rgba(15, 25, 20, 0.70);
   z-index: 9999;
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
 
-/* ✅ Drawer עצמו (זה היה חסר אצלך!) */
+/* Drawer */
 .drawer{
   position: absolute;
   top: 0;
@@ -205,7 +225,6 @@ const t = computed(() => {
   width: min(340px, 86vw);
   height: 100vh;
 
-  /* ירוק כמו הלוגו, לא שקוף */
   background: linear-gradient(180deg, #2f6b4f 0%, #3f7f63 100%);
 
   border-right: 3px solid #24513f;
@@ -235,7 +254,6 @@ const t = computed(() => {
   padding: 12px 12px;
   border-radius: 16px;
 
-  /* כרטיס ירקרק בהיר על רקע ירוק */
   background: rgba(233,243,238,0.95);
   border: 2px solid #24513f;
 
@@ -278,7 +296,7 @@ const t = computed(() => {
   font-weight: 900;
 
   color: #1f3f32;
-  background: rgba(233,243,238,0.95); /* לא שקוף */
+  background: rgba(233,243,238,0.95);
   border: 2px solid #24513f;
 
   box-shadow: 0 10px 22px rgba(31,63,50,0.14);

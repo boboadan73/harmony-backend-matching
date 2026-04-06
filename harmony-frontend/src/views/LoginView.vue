@@ -35,24 +35,29 @@
             @keyup.enter="continueLogin"
           />
         </div>
+        <p v-if="errorMessage" class="errorText">
+  {{ errorMessage }}
+</p>
 
         <p v-if="phoneTouched && phone.trim() && !isIdValid" class="errorText">
           {{ t.phoneError }}
         </p>
+
         <p class="privacy-note">
-  {{ privacyText[lang] }}
-</p>
+          {{ privacyText[lang] }}
+        </p>
 
         <!-- BUTTONS -->
         <div class="btnBar">
-          <button type="button" class="primaryBtn" :disabled="!isIdValid" @click="continueLogin">
-            {{ t.continue }}
-          </button>
+  <button class="primaryBtn" :disabled="!phone" @click="continueLogin">
+    {{ t.continue }}
+  </button>
 
-          <button type="button" class="secondaryBtn" @click="newParticipant">
-            {{ t.newParticipant }}
-          </button>
-        </div>
+  <button class="secondaryBtn" type="button" @click="goToRegister">
+    {{ t.newParticipant }}
+  </button>
+</div>
+
       </div>
     </div>
   </div>
@@ -62,17 +67,22 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authStore } from '@/store/authStore'
+import { buildApiUrl } from '@/services/api'
+
+
+
 
 const router = useRouter()
-
-// כרגע נשאיר את השם phone כדי לא לשבור לך CSS.
-// אבל בפועל – אנחנו משתמשים בזה בתור "participant id" בשביל הבדיקה.
 const phone = ref('')
 const phoneTouched = ref(false)
+const errorMessage = ref('')
+
+
 
 const LANG_KEY = 'harmony_lang'
 const lang = ref(localStorage.getItem(LANG_KEY) || 'en')
 watch(lang, v => localStorage.setItem(LANG_KEY, v), { immediate: true })
+
 const privacyText = {
   en: 'By continuing, you agree to the Privacy Policy. Your data will only be used for networking recommendations during the event.',
   he: 'בהמשך השימוש במערכת, את/ה מסכימ/ה למדיניות הפרטיות. המידע שלך ישמש רק ליצירת התאמות נטוורקינג במהלך האירוע.',
@@ -81,24 +91,32 @@ const privacyText = {
 
 const TEXTS = {
   en: {
+    subtitle: 'Sign in to view your matches',
     language: 'Language',
     phone: 'Participant Phone Number',
     phonePlaceholder: '',
-    phoneError: 'Please enter a valid numeric ID (e.g. 15).',
+    phoneError: 'Please enter a valid phone number.',
+    loginError: 'Login failed. Please check the phone number and try again.',
     continue: 'Continue',
     newParticipant: 'New participant',
   },
   ar: {
+    subtitle: 'سجّل/ي الدخول لعرض المطابقات',
     language: 'اللغة',
     phone: 'رقم الهاتف',
     phonePlaceholder: '',
+    phoneError: 'يرجى إدخال رقم هاتف صحيح.',
+    loginError: 'فشل تسجيل الدخول. يرجى التحقق من رقم الهاتف والمحاولة مرة أخرى.',
     continue: 'متابعة',
     newParticipant: 'مشارك جديد',
   },
   he: {
+    subtitle: 'התחבר/י כדי לראות את ההתאמות שלך',
     language: 'שפה',
     phone: 'מספר טלפון',
     phonePlaceholder: '',
+    phoneError: 'נא להזין מספר טלפון תקין.',
+    loginError: 'ההתחברות נכשלה. נא לבדוק את מספר הטלפון ולנסות שוב.',
     continue: 'המשך',
     newParticipant: 'משתתף חדש',
   },
@@ -107,54 +125,81 @@ const TEXTS = {
 const t = computed(() => TEXTS[lang.value] ?? TEXTS.en)
 const isRtl = computed(() => lang.value === 'ar' || lang.value === 'he')
 
-// מוציא רק ספרות (כדי שאם כתבו רווח/תו זה לא יפיל)
-function normalizeId(raw) {
-  const s = (raw || '').trim()
-  const digitsOnly = s.replace(/[^\d]/g, '')
-  return digitsOnly
+function normalizePhone(raw) {
+  return String(raw || '').replace(/[^\d]/g, '').trim()
 }
 
-function isValidId(raw) {
-  const id = normalizeId(raw)
-  // מאפשר גם מספר שמתחיל ב-0 (טלפון)
-  return /^\d+$/.test(id)
-}
-function logout() {
-  localStorage.removeItem('harmony_pid')
-  router.push('/login')
+function isValidPhone(raw) {
+  const normalized = normalizePhone(raw)
+  return normalized.length >= 7
 }
 
-
-const isIdValid = computed(() => isValidId(phone.value))
+const isIdValid = computed(() => isValidPhone(phone.value))
 
 function onPhoneInput() {
   phoneTouched.value = true
+  errorMessage.value = ''
 }
 
-function continueLogin() {
-  if (!isIdValid.value) return
-  const id = normalizeId(phone.value)
+async function loginAndRoute(targetRoute) {
+  phoneTouched.value = true
+  errorMessage.value = ''
 
-  authStore.phone = id
-  authStore.isLoggedIn = true
+  if (!isIdValid.value) {
+    errorMessage.value = t.value.phoneError
+    return
+  }
 
-  localStorage.setItem('harmony_pid', id)
+  const enteredPhone = normalizePhone(phone.value)
 
-  router.push(`/matches/${id}`)
+  try {
+    const url = buildApiUrl('/api/auth/phone-login')
+    console.log('POST URL:', url)
+    console.log('PHONE:', enteredPhone)
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: enteredPhone }),
+    })
+
+    const rawText = await res.text()
+    console.log('STATUS:', res.status)
+    console.log('RESPONSE TEXT:', rawText)
+
+    let data = {}
+    try {
+      data = rawText ? JSON.parse(rawText) : {}
+    } catch {
+      data = {}
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.error || data?.message || `HTTP ${res.status}`)
+    }
+
+    const pid = String(data.participantId || '').trim()
+    if (!pid) {
+      throw new Error('Missing participantId in response')
+    }
+
+    authStore.phone = enteredPhone
+    authStore.isLoggedIn = true
+    localStorage.setItem('harmony_pid', pid)
+
+    router.push(`/${targetRoute}/${pid}`)
+  } catch (err) {
+    console.error('LOGIN ERROR:', err)
+    errorMessage.value = err.message || t.value.loginError
+  }
 }
 
-
-function newParticipant() {
-  const id = normalizeId(phone.value)
-  if (!id) return
-
-  authStore.phone = id
-  authStore.isLoggedIn = true
-  localStorage.setItem('harmony_pid', id)
-
-  router.push(`/profile/${id}`)
+async function continueLogin() {
+  await loginAndRoute('matches')
 }
-
+async function goToRegister() {
+  router.push('/profile/new')
+}
 
 </script>
 
@@ -185,14 +230,12 @@ function newParticipant() {
   padding: 26px 22px;
   border-radius: 26px;
 
-  /* glass ירקרק (לא לבן מדי) */
   background: linear-gradient(
     180deg,
     rgba(233,243,238,0.92),
     rgba(255,255,255,0.80)
   );
 
-  /* מסגרת ירוקה כמו בלוגו */
   border: 2.5px solid #2f6b4f;
 
   box-shadow:
@@ -232,7 +275,6 @@ function newParticipant() {
   height: 52px;
   box-sizing: border-box;
 
-  /* מסגרת ירקרקה עדינה */
   border: 2px solid rgba(47,107,79,0.25);
   background: rgba(255,255,255,0.94);
   color: var(--h-text);
@@ -246,12 +288,14 @@ function newParticipant() {
   border-color: #2f6b4f;
   box-shadow: 0 0 0 4px rgba(47,107,79,0.18), 0 12px 26px rgba(31,63,50,0.10);
 }
+
 .field{
   width: 100%;
+  position: relative;
 }
 
 .selectInput{
-  padding-right: 44px; /* נשאיר מקום לחץ שלך */
+  padding-right: 44px;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -259,11 +303,13 @@ function newParticipant() {
 
 .arrow{
   pointer-events: none;
-  right: 16px;
+  position:absolute;
+  right:16px;
+  top:50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
 }
 
-
-.arrow{ position:absolute; right:16px; top:50%; transform: translateY(-50%); opacity: 0.6; }
 .ltrNum{ direction:ltr; unicode-bidi: plaintext; }
 
 .errorText{
@@ -274,27 +320,22 @@ function newParticipant() {
 }
 
 /* ===== BUTTONS BAR ===== */
-.btnBar{
-  position: sticky;
-  bottom: 0;
-  padding-top: 12px;
-  display: grid;
+.btnBar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-
-  margin-left: -22px;
-  margin-right: -22px;
-  padding-left: 22px;
-  padding-right: 22px;
-
-  border-bottom-left-radius: 26px;
-  border-bottom-right-radius: 26px;
-
-  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(233,243,238,0.95));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  margin-top: 18px;
 }
 
-/* ===== BUTTONS (מסגרת ירוקה כמו Matches) ===== */
+.btnBar .primaryBtn,
+.btnBar .secondaryBtn {
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+  margin: 0;
+}
+
 .primaryBtn,
 .secondaryBtn{
   width: 100%;
@@ -303,22 +344,18 @@ function newParticipant() {
   font-weight: 900;
   font-size: 16px;
   cursor: pointer;
-
   border: 2.5px solid #2f6b4f;
   color: #1f3f32;
-
   box-shadow: 0 14px 30px rgba(31,63,50,0.12);
   transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
 }
 
 .primaryBtn{
-  /* Continue קצת יותר "premium" */
   background: linear-gradient(135deg, rgba(233,243,238,0.98), rgba(206,232,221,0.98));
 }
 
 .secondaryBtn{
-  /* New participant — אותו סגנון, קצת יותר לבן */
-  background: rgba(233,243,238,0.88);
+  background: linear-gradient(135deg, rgba(233,243,238,0.98), rgba(206,232,221,0.98));
 }
 
 .primaryBtn:hover,
@@ -360,11 +397,11 @@ function newParticipant() {
     border-bottom-right-radius: 18px;
   }
 }
+
 .privacy-note {
   margin-top: 14px;
   font-size: 12px;
   text-align: center;
   color: #4b5f52;
 }
-
 </style>
