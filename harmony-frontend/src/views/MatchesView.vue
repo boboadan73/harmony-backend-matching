@@ -323,8 +323,12 @@ function toUiMatch(raw) {
   whyMatched: raw?.reason ?? '',
   whyMatched_en: raw?.reason_en ?? '',
   whyMatched_he: raw?.reason_he ?? '',
-  avatar: (raw?.imageUrl && String(raw.imageUrl).trim()) ? raw.imageUrl : placeholderAvatar,
-  saved: false,
+avatar:
+  (raw?.image && String(raw.image).trim()) ||
+  (raw?.photoUrl && String(raw.photoUrl).trim()) ||
+  (raw?.imageUrl && String(raw.imageUrl).trim()) ||
+  placeholderAvatar,
+    saved: false,
   met: false,
 }
 }
@@ -339,22 +343,22 @@ async function fetchMatches() {
   try {
     const [matchRes, savedRes, metRes] = await Promise.all([
       fetch(buildMatchApiUrl(`/api/match/${pid}`)),
-      fetch(buildApiUrl(`/api/saved/${pid}`)),
-      fetch(buildApiUrl(`/api/met/${pid}`)),
+      fetch(buildApiUrl(`/api/eventParticipants/${pid}/saved`)),
+      fetch(buildApiUrl(`/api/eventParticipants/${pid}/met`)),
     ])
 
     if (!matchRes.ok) throw new Error(`API error: ${matchRes.status}`)
     if (!savedRes.ok) throw new Error(`API error: ${savedRes.status}`)
     if (!metRes.ok) throw new Error(`API error: ${metRes.status}`)
 
-    const [matchData, savedIdsRaw, metIdsRaw] = await Promise.all([
-      matchRes.json(),
-      savedRes.json(),
-      metRes.json(),
-    ])
+const [matchData, savedData, metData] = await Promise.all([
+  matchRes.json(),
+  savedRes.json(),
+  metRes.json(),
+])
 
-    const savedIds = new Set((savedIdsRaw || []).map(String))
-    const metIds = new Set((metIdsRaw || []).map(String))
+const savedIds = new Set(((savedData?.saved) || []).map(String))
+const metIds = new Set(((metData?.met) || []).map(String))
 
     const rawMatches = normalizeResponse(matchData)
 
@@ -419,16 +423,12 @@ async function save(m) {
   const pid = participantId()
 
   try {
-    const res = await fetch(buildApiUrl('/api/save'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId: pid,
-        targetId: String(m.id),
-        remove: !!m.saved,
-      })
+    const url = buildApiUrl(
+      `/api/eventParticipants/${pid}/save/${m.id}`
+    )
+
+    const res = await fetch(url, {
+      method: m.saved ? 'DELETE' : 'POST'
     })
 
     if (!res.ok) throw new Error(`API error: ${res.status}`)
@@ -443,16 +443,12 @@ async function markMet(m) {
   const pid = participantId()
 
   try {
-    const res = await fetch(buildApiUrl('/api/met'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId: pid,
-        targetId: String(m.id),
-        remove: !!m.met,
-      })
+    const url = buildApiUrl(
+      `/api/eventParticipants/${pid}/met/${m.id}`
+    )
+
+    const res = await fetch(url, {
+      method: m.met ? 'DELETE' : 'POST'
     })
 
     if (!res.ok) throw new Error(`API error: ${res.status}`)

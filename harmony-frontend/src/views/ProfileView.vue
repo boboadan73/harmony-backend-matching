@@ -378,7 +378,7 @@ async function loadProfile() {
   successMsg.value = ''
 
   try {
-    const res = await fetch(buildSystemApiUrl(`/api/participants/p${pid.value}`))
+    const res = await fetch(buildSystemApiUrl(`/api/eventParticipants/${pid.value}`))
     if (!res.ok) throw new Error('load failed')
 
     const data = await res.json()
@@ -435,8 +435,8 @@ async function saveProfile() {
     const isNew = isNewParticipant.value
 
     const url = isNew
-      ? buildSystemApiUrl('/api/participants')
-      : buildSystemApiUrl(`/api/participants/p${pid.value}`)
+      ? buildSystemApiUrl('/api/eventParticipants')
+      : buildSystemApiUrl(`/api/eventParticipants/${pid.value}`)
 
     const method = isNew ? 'POST' : 'PUT'
 
@@ -494,7 +494,7 @@ async function togglePrivacy() {
   successMsg.value = ''
 
   try {
-    const res = await fetch(buildSystemApiUrl(`/api/participants/p${pid.value}/privacy`), {
+    const res = await fetch(buildSystemApiUrl(`/api/eventParticipants/${pid.value}/privacy`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ hidden: !profile.value.hidden }),
@@ -525,7 +525,7 @@ async function deleteMyData() {
   successMsg.value = ''
 
   try {
-    const res = await fetch(buildSystemApiUrl(`/api/participants/p${pid.value}`), {
+    const res = await fetch(buildSystemApiUrl(`/api/eventParticipants/${pid.value}`), {
       method: 'DELETE',
     })
 

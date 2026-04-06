@@ -178,10 +178,10 @@ async function loginAndRoute(targetRoute) {
       throw new Error(data?.error || data?.message || `HTTP ${res.status}`)
     }
 
-    const pid = String(data.participantId || '').trim()
+const pid = data?.participantId ? String(data.participantId).trim() : ''
     if (!pid) {
-      throw new Error('Missing participantId in response')
-    }
+  throw new Error('Login failed: missing participantId')
+}
 
     authStore.phone = enteredPhone
     authStore.isLoggedIn = true

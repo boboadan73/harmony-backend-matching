@@ -41,7 +41,7 @@ function mapParticipant(participant) {
   rowNumber: participant.rowNumber || 0,
   name: participant.name || "",
 
-  phoneNumber: normalizePhone(participant.phoneNumber),
+phoneNumber: normalizePhone(participant.phoneNumber),
   phone: normalizePhone(participant.phoneNumber),
 
   jobTitle: participant.jobTitle || "",
@@ -211,7 +211,7 @@ router.post("/", async (req, res) => {
       eventId: body.eventId || "",
       rowNumber: body.rowNumber || 0,
       name: body.name || "",
-      phoneNumber: normalizePhone(body.phoneNumber || ""),
+      phoneNumber: normalizePhone(body.phoneNumber || body.phone || ""),
       jobTitle: body.jobTitle || "",
       academicResume: body.academicResume || "",
       professionalResume: body.professionalResume || "",
@@ -247,14 +247,25 @@ router.put("/:id", async (req, res) => {
     }
 
     const fieldMap = {
-      name: "name",
-      jobTitle: "jobTitle",
-      academicResume: "academicResume",
-      professionalResume: "professionalResume",
-      personalResume: "personalResume",
-      iWantToMeet: "iWantToMeet",
-      photoUrl: "photoUrl",
-    };
+  name: "name",
+
+  job: "jobTitle",
+  jobTitle: "jobTitle",
+
+  academic: "academicResume",
+  academicResume: "academicResume",
+
+  professional: "professionalResume",
+  professionalResume: "professionalResume",
+
+  personal: "personalResume",
+  personalResume: "personalResume",
+
+  image: "photoUrl",
+  photoUrl: "photoUrl",
+
+  iWantToMeet: "iWantToMeet",
+};
 
     for (const [bodyField, docField] of Object.entries(fieldMap)) {
       if (Object.prototype.hasOwnProperty.call(req.body, bodyField)) {
