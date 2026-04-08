@@ -14,13 +14,78 @@ const client = new CosmosClient({
 });
 
 const database = client.database("harmony-db");
-const container = database.container("participants");
+const container = database.container("eventParticipants");
+
+// ------ CACHE (REDIS) ------
+const { createClient } = require("redis");
+
+const redis = createClient({
+  url: process.env.REDIS_URL,
+});
+
+redis.on("error", (err) => {
+  console.error("Redis Client Error:", err);
+});
+
+let redisReady = false;
+
+async function ensureRedisConnected() {
+  if (!redisReady) {
+    await redis.connect();
+    redisReady = true;
+    console.log("Redis connected");
+  }
+}
 
 
+function matchCacheKey(eventId, targetId) {
+  return `match:${eventId}:${targetId}`;
+}
 
+async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 60 * 24 * 30) {
+  await ensureRedisConnected();
+
+  const key = matchCacheKey(eventId, targetId);
+
+  const payload = {
+    targetId,
+    matches,
+  };
+
+  await redis.set(key, JSON.stringify(payload), {
+    EX: ttlSeconds,
+  });
+}
+
+async function getMatchCache(eventId, targetId) {
+  await ensureRedisConnected();
+
+  const key = matchCacheKey(eventId, targetId);
+  const raw = await redis.get(key);
+
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("Failed to parse match cache:", err);
+    return null;
+  }
+}
+
+async function deleteMatchCache(eventId, targetId) {
+  await ensureRedisConnected();
+
+  const key = `match:${eventId}:${targetId}`;
+  await redis.del(key);
+
+  console.log("Cache deleted:", key);
+}
 // =====================================
 // EMBEDDINGS
 // =====================================
+
+// add our model ?????????????????????????????
 async function getEmbeddings(texts) {
   const response = await axios.post(
     'https://harmony-ml.onrender.com/embed',
@@ -34,51 +99,290 @@ async function getEmbeddings(texts) {
 // ROUTES
 // =====================================
 
-// health
-app.get("/", (req, res) => {
-  res.send("Backend is running");
-});
 
-// ✅ COSMOS PARTICIPANTS
-app.get("/api/participants", async (req, res) => {
+// health
+// app.get("/", (req, res) => {
+//   res.send("Backend is running");
+// });
+
+// // ✅ COSMOS PARTICIPANTS
+// app.get("/api/participants", async (req, res) => {
+//   try {
+//     const { resources } = await container.items.readAll().fetchAll();
+//     res.json(resources);
+//     console.log("🔥 DATA SOURCE: COSMOS DB");
+// console.log("Total participants:", resources.length);
+//   } catch (err) {
+//     console.error("Cosmos ERROR:", err);
+//     res.status(500).json({ error: "Failed to fetch from Cosmos" });
+//   }
+// });
+
+
+// MATCHING
+const { handleParticipant } = require("./similarity");
+const { handleParticipantMatchesOnly } = require("./similarity");
+const { AllEmbeddings } = require("./generateEmbeddings");
+
+
+
+
+// =====================================
+// 1) Rebuild matches for ALL participants
+// -------------------------------------
+// Use this route when you want to recalculate embeddings/matches
+// for the entire participants table.
+// Typical use case:
+// - model was retrained
+// - matching logic changed
+// - full system refresh is needed
+// =====================================
+app.post("/api/match/rebuild-all/:eventId",  async (req, res) => {
+  
   try {
-    const { resources } = await container.items.readAll().fetchAll();
-    res.json(resources);
-    console.log("🔥 DATA SOURCE: COSMOS DB");
-console.log("Total participants:", resources.length);
+    const eventId = req.params.eventId;
+    const adminId = req.adminAuth.providerUserId;
+
+
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.eventId = @eventId",
+      parameters: [{ name: "@eventId", value: eventId }],
+    };
+
+    const { resources } = await container.items.query(querySpec).fetchAll();
+
+    if (!resources || resources.length === 0) {
+      return res.status(404).json({ error: "No participants found for this event" });
+    }
+
+    // Stop if any participant is already being processed
+    const alreadyProcessing = resources.find((p) => p.status === "processing");
+    if (alreadyProcessing) {
+      return res.status(409).json({
+        error: `Participant ${alreadyProcessing.id} is already being processed`,
+      });
+    }
+
+    // Mark all participants in this event as processing
+    for (const participant of resources) {
+      participant.status = "processing";
+      await container.items.upsert(participant);
+    }
+
+    // Rebuild embeddings for this event
+    await AllEmbeddings(resources, eventId);
+
+// Compute matches for each participant, save to cache, and mark as ready
+  for (const participant of resources) {
+  const matches = await handleParticipantMatchesOnly(participant.id, resources, 5);
+  await setMatchCache(eventId, participant.id, matches);
+
+  participant.status = "ready";
+  await container.items.upsert(participant);
+}
+
+    res.json({
+      message: "All embeddings rebuilt and all participants were processed successfully",
+      eventId,
+      totalParticipants: resources.length,
+    });
   } catch (err) {
-    console.error("Cosmos ERROR:", err);
-    res.status(500).json({ error: "Failed to fetch from Cosmos" });
+    console.error("rebuild-all error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
-// MATCHING
-const { getTopMatches } = require("./similarity");
-const { explainPair } = require("./llmExplanation");
 
+// =====================================
+// Update existing participant
+// -------------------------------------
+// Use this route when an existing participant was edited.
+// Since old matching data may already exist, we must first remove:
+// - profile_text
+// - profile_embedding
+//
+// This prevents using stale embeddings based on outdated profile data.
+// After cleanup, the participant can be marked for recalculation.
+// =====================================
 
-app.get("/api/match/:id", async (req, res) => {
+//add deleting from cache????????????????????????
+
+app.get("/api/match/update/:eventId/:id", async (req, res) => {
   try {
-    const targetId = parseInt(req.params.id);
+    const eventId = req.params.eventId;   // keep as raw string
+    const targetId = req.params.id;       // keep raw ID format, e.g. "p12"
 
-    const matches = await getTopMatches(targetId,5);
+    // Find the participant in Cosmos by BOTH eventId and id
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.eventId = @eventId AND c.id = @id",
+      parameters: [
+        { name: "@eventId", value: eventId },
+        { name: "@id", value: targetId },
+      ],
+    };
 
-    // 🔥 ADD THIS PART
-    const matchesWithExplanation = await Promise.all(
-      matches.map(async (m) => {
-        const explanation = await explainPair(targetId, m.id);
+    const { resources } = await container.items.query(querySpec).fetchAll();
 
-        return {
-          ...m,
-          explanation: explanation.explanation, // ar/en/he
-          match_name: explanation.match_name
-        };
-      })
-    );
+    if (!resources || resources.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
 
-    res.json(matchesWithExplanation);
+    const participant = resources[0];
 
+    // Remove old matching fields if they exist
+    delete participant.profile_text;
+    delete participant.profile_embedding;
+    //await deleteMatchCache(eventId, participant.id); // delete cache for this participant
+
+    // Mark participant as needing recalculation
+    participant.status = "pending";
+
+    // Save updated participant back to Cosmos
+    await container.items.upsert(participant);
+
+    // Reuse the same shared flow
+    const matches = await handleParticipant(participant, eventId);
+    await setMatchCache(eventId, participant.id, matches);
+
+    participant.status = "ready";
+    await container.items.upsert(participant);
+    return res.status(200).json({
+        message: "Matches calculated and saved successfully.",
+        participantId: participant.id,
+        status: participant.status,
+        matches,
+      });
   } catch (err) {
-    console.error(err);
+    console.error("update participant match error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================================
+// Add new participant
+// -------------------------------------
+// Use this route when a new participant is added to the system.
+// A new participant does not yet have profile_text/profile_embedding,
+// so there is nothing to delete.
+// The participant is simply prepared for future matching calculation.
+// =====================================
+app.post("/api/match/add/:eventId/:id", async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const targetId = req.params.id;
+
+    // Find the participant in Cosmos by eventId + id
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.eventId = @eventId AND c.id = @id",
+      parameters: [
+        { name: "@eventId", value: eventId },
+        { name: "@id", value: targetId },
+      ],
+    };
+
+    const { resources } = await container.items.query(querySpec).fetchAll();
+
+    if (!resources || resources.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const participant = resources[0];
+
+    const matches = await handleParticipant(participant, eventId);
+    await setMatchCache(eventId, participant.id, matches);
+
+    participant.status = "ready";
+    await container.items.upsert(participant);
+    return res.status(200).json({
+        message: "Matches calculated and saved successfully.",
+        participantId: participant.id,
+        status: participant.status,
+        matches,
+      });
+  } catch (err) {
+    console.error("add participant match error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================================
+// 4) Fallback / exceptional case route
+// ------------------------------------
+// This route is used when saved matches do NOT exist,
+// or when the system must calculate matches on demand.
+//
+// In other words:
+// - no stored matches were found
+// - match cache is missing
+// - temporary recovery/fallback flow is needed
+//
+// This route calls getTopMatches(...), which means it computes
+// similarity dynamically at request time instead of only reading
+// precomputed results.
+// =====================================
+app.get("/api/match/:eventId/:id", async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const targetId = req.params.id;
+
+    // Find participant by eventId + id
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.eventId = @eventId AND c.id = @id",
+      parameters: [
+        { name: "@eventId", value: eventId },
+        { name: "@id", value: targetId },
+      ],
+    };
+
+    const { resources } = await container.items.query(querySpec).fetchAll();
+
+    if (!resources || resources.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const participant = resources[0];
+
+    // Case 1: matches are already ready
+    if (participant.status === "ready") {
+    const cachedMatches = await getMatchCache(eventId, targetId);
+
+    if (cachedMatches) {
+    return res.status(200).json(cachedMatches);
+    }
+
+  return res.status(404).json({
+    error: "Participant is marked ready but no cached matches were found.",
+    participantId: participant.id,
+    status: participant.status,
+  });
+}
+    // Case 2: calculation is already running
+    if (participant.status === "processing") {
+      return res.status(409).json({
+        error: "Matching is already in progress for this participant",
+      });
+    }
+
+    // Case 3: participant needs recalculation
+    if (participant.status === "pending") {
+      const matches = await handleParticipant(participant, eventId);
+      await setMatchCache(eventId, participant.id, matches);
+
+      participant.status = "ready";
+      await container.items.upsert(participant);
+
+      return res.status(200).json({
+        message: "Matches calculated and saved successfully.",
+        participantId: participant.id,
+        status: participant.status,
+        matches,
+      });
+    }
+
+    return res.status(400).json({
+      error: `Unsupported participant status: ${participant.status}`,
+    });
+  } catch (err) {
+    console.error("get participant matches error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -407,48 +711,8 @@ app.post("/api/auth/phone-login", async (req, res) => {
     });
   }
 });
-// =====================================
-// ROUTES
-// =====================================
 
-// health
-app.get("/", (req, res) => {
-  res.send("Backend is running");
-});
-app.get("/test-data", async (req, res) => {
-  try {
-    const { resources } = await container.items.readAll().fetchAll();
 
-    res.json({
-      count: resources.length,
-      firstItem: resources[0] || null,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-// ✅ ADD IT HERE
-app.get("/test-db", async (req, res) => {
-  try {
-    const { resource } = await database.read();
-
-    res.json({
-      ok: true,
-      message: "Database connected successfully",
-      databaseId: resource.id,
-      containerId: container.id,
-    });
-  } catch (error) {
-    console.error("DB error:", error.message);
-
-    res.status(500).json({
-      ok: false,
-      message: "Database connection failed",
-      error: error.message,
-    });
-  }
-});
 
 // =====================================
 // START SERVER
