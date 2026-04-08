@@ -9,7 +9,7 @@ const client = new CosmosClient({
 });
 
 const database = client.database("harmony-db");
-const container = database.container("participants");
+const container = database.container("eventParticipants");
 
 const STOPWORDS_AR = [
   "مهندس","شهادة","لقب","اول","ثاني","بكالوريوس","ماجستير",
@@ -55,6 +55,7 @@ async function getEmbeddings(texts) {
   return response.data.embeddings;
 }
 
+
 async function getEmbeddingsBatched(texts, batchSize = 5) {
   const all = [];
 
@@ -68,18 +69,63 @@ async function getEmbeddingsBatched(texts, batchSize = 5) {
   return all;
 }
 
-async function main() {
-  const { resources } = await container.items.readAll().fetchAll();
-  console.log(`Loaded ${resources.length} participants from Cosmos`);
+async function generateProfileEmbedding(participant) {
+  const jobText = removeStopwords(normalizeText(participant.jobTitle || ""));
+  const academicText = removeStopwords(normalizeText(participant.academicResume || ""));
+  const professionalText = removeStopwords(normalizeText(participant.professionalResume || ""));
+  const personalText = removeStopwords(normalizeText(participant.personalResume || ""));
+
+  const profileText = [jobText, academicText, professionalText, personalText]
+      .filter(Boolean)
+      .join(" ");
+
+  const textsToEmbed = [
+    jobText || " ",
+    academicText || " ",
+    professionalText || " ",
+    personalText || " ",
+    profileText || " "
+  ];
+
+  const embeddings = await getEmbeddingsBatched(textsToEmbed, 5);
+
+  const updatedDoc = {
+    ...participant,
+
+    job_clean: jobText,
+    academic_clean: academicText,
+    professional_clean: professionalText,
+    personal_clean: personalText,
+    profile_text: profileText,
+
+    job_embedding: embeddings[0],
+    academic_embedding: embeddings[1],
+    professional_embedding: embeddings[2],
+    personal_embedding: embeddings[3],
+    profile_embedding: embeddings[4],
+  };
+
+  await container.items.upsert(updatedDoc);
+  console.log(`Updated participant: ${participant.id}`);
+  console.log("Done.");
+}
+
+async function AllEmbeddings(resources, eventId) {
+  if (!resources || resources.length === 0) {
+    throw new Error(`No participants found for event ${eventId}`);
+  }
+
+  console.log(`Loaded ${resources.length} participants from Cosmos for event ${eventId}`);
 
   for (let idx = 0; idx < resources.length; idx++) {
     const p = resources[idx];
 
-    const jobText = removeStopwords(normalizeText(p.job));
-    const academicText = removeStopwords(normalizeText(p.academic));
-    const professionalText = removeStopwords(normalizeText(p.professional));
-    const personalText = removeStopwords(normalizeText(p.personal));
-    const profileText = [academicText, professionalText, personalText]
+    const jobText = removeStopwords(normalizeText(p.jobTitle || ""));
+    const academicText = removeStopwords(normalizeText(p.academicResume || ""));
+    const professionalText = removeStopwords(normalizeText(p.professionalResume || ""));
+    const personalText = removeStopwords(normalizeText(p.personalResume || ""));
+
+    const profileText = [jobText, academicText, professionalText, personalText]
       .filter(Boolean)
       .join(" ");
 
@@ -88,18 +134,21 @@ async function main() {
       academicText || " ",
       professionalText || " ",
       personalText || " ",
-      profileText || " ",
+      profileText || " "
     ];
 
     const embeddings = await getEmbeddingsBatched(texts, 5);
 
     const updatedDoc = {
       ...p,
+
       job_clean: jobText,
       academic_clean: academicText,
       professional_clean: professionalText,
       personal_clean: personalText,
+
       profile_text: profileText,
+
       job_embedding: embeddings[0],
       academic_embedding: embeddings[1],
       professional_embedding: embeddings[2],
@@ -107,14 +156,20 @@ async function main() {
       profile_embedding: embeddings[4],
     };
 
-    //await container.item(p.id, p.event_id || undefined).replace(updatedDoc);
     await container.items.upsert(updatedDoc);
     console.log(`Updated ${idx + 1}/${resources.length}: ${p.id}`);
   }
 
-  console.log("Done.");
+  console.log(`Done embeddings for event ${eventId}.`);
 }
 
-main().catch((err) => {
-  console.error("generateEmbeddings failed:", err);
-});
+module.exports = {
+  generateProfileEmbedding,
+  AllEmbeddings,
+};
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("generateEmbeddings failed:", err);
+  });
+}
