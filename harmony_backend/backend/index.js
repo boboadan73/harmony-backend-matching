@@ -137,11 +137,21 @@ const { AllEmbeddings } = require("./generateEmbeddings");
 // - matching logic changed
 // - full system refresh is needed
 // =====================================
-app.get("/api/match/admin/rebuild-all/:eventId",  async (req, res) => {
+app.post("/api/match/admin/rebuild-all/:eventId",verifyAdminToken,  async (req, res) => {
   
   try {
     const eventId = req.params.eventId;
     const adminId = req.adminAuth.providerUserId;
+    const adminId = req.adminAuth.providerUserId;
+    const { resource: event } = await eventsContainer.item(eventId, eventId).read();
+
+if (!event) {
+  return res.status(404).json({ error: "Event not found" });
+}
+
+if (event.createdByAdminId !== adminId) {
+  return res.status(403).json({ error: "Forbidden" });
+}
 
 
     const querySpec = {
@@ -207,10 +217,20 @@ app.get("/api/match/admin/rebuild-all/:eventId",  async (req, res) => {
 
 //add deleting from cache????????????????????????
 
-app.get("/api/match/admin/update/:eventId/:id", async (req, res) => {
+app.post("/api/match/admin/update/:eventId/:id", verifyAdminToken, async (req, res) => {
   try {
     const eventId = req.params.eventId;   // keep as raw string
     const targetId = req.params.id;       // keep raw ID format, e.g. "p12"
+    const adminId = req.adminAuth.providerUserId;
+    const { resource: event } = await eventsContainer.item(eventId, eventId).read();
+
+   if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+}
+
+ if (event.createdByAdminId !== adminId) {
+     return res.status(403).json({ error: "Forbidden" });
+}
 
     // Find the participant in Cosmos by BOTH eventId and id
     const querySpec = {
@@ -317,10 +337,20 @@ app.get("/api/match/update/:eventId/:id", async (req, res) => {
 // so there is nothing to delete.
 // The participant is simply prepared for future matching calculation.
 // =====================================
-app.post("/api/match/admin/add/:eventId/:id", async (req, res) => {
+app.post("/api/match/admin/add/:eventId/:id", verifyAdminToken, async (req, res) => {
   try {
     const eventId = req.params.eventId;
     const targetId = req.params.id;
+     const adminId = req.adminAuth.providerUserId;
+    const { resource: event } = await eventsContainer.item(eventId, eventId).read();
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+}
+
+   if (event.createdByAdminId !== adminId) {
+     return res.status(403).json({ error: "Forbidden" });
+}
 
     // Find the participant in Cosmos by eventId + id
     const querySpec = {
