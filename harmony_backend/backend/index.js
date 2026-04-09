@@ -191,60 +191,7 @@ app.get("/api/match/admin/rebuild-all/:eventId",  async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-app.post("/api/match/rebuild-all/:eventId",  async (req, res) => {
-  
-  try {
-    const eventId = req.params.eventId;
-    const adminId = req.adminAuth.providerUserId;
 
-
-    const querySpec = {
-      query: "SELECT * FROM c WHERE c.eventId = @eventId",
-      parameters: [{ name: "@eventId", value: eventId }],
-    };
-
-    const { resources } = await container.items.query(querySpec).fetchAll();
-
-    if (!resources || resources.length === 0) {
-      return res.status(404).json({ error: "No participants found for this event" });
-    }
-
-    // Stop if any participant is already being processed
-    const alreadyProcessing = resources.find((p) => p.status === "processing");
-    if (alreadyProcessing) {
-      return res.status(409).json({
-        error: `Participant ${alreadyProcessing.id} is already being processed`,
-      });
-    }
-
-    // Mark all participants in this event as processing
-    for (const participant of resources) {
-      participant.status = "processing";
-      await container.items.upsert(participant);
-    }
-
-    // Rebuild embeddings for this event
-    await AllEmbeddings(resources, eventId);
-
-// Compute matches for each participant, save to cache, and mark as ready
-  for (const participant of resources) {
-  const matches = await handleParticipantMatchesOnly(participant.id, resources, 5);
-  await setMatchCache(eventId, participant.id, matches);
-
-  participant.status = "ready";
-  await container.items.upsert(participant);
-}
-
-    res.json({
-      message: "All embeddings rebuilt and all participants were processed successfully",
-      eventId,
-      totalParticipants: resources.length,
-    });
-  } catch (err) {
-    console.error("rebuild-all error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // =====================================
 // Update existing participant
