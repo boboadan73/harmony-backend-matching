@@ -1,11 +1,9 @@
-
 import os
 from fastapi import FastAPI
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 from typing import List
 
-# Create FastAPI app
 app = FastAPI()
 
 model = None
@@ -18,8 +16,8 @@ def load_model():
         token=os.getenv("HF_TOKEN")
     )
     print("Model loaded successfully")
-print("Model loaded successfully")
-# Define request schema
+
+
 class TextRequest(BaseModel):
     texts: List[str]
 
