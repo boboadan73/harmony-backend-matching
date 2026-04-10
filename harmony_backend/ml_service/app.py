@@ -10,29 +10,30 @@ class TextRequest(BaseModel):
     texts: List[str]
 
 model = None
-model_loading = False
+model_lock = threading.Lock()
 
-def load_model_once():
-    global model, model_loading
-    if model is None and not model_loading:
-        model_loading = True
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer(
-            "rayanmahmoud/harmony_model",
-            token=os.getenv("HF_TOKEN")
-        )
-        model_loading = False
-        print("✅ Model loaded successfully")
+def get_model():
+    global model
+    if model is None:
+        with model_lock:
+            if model is None:
+                from sentence_transformers import SentenceTransformer
+                model = SentenceTransformer(
+                    "rayanmahmoud/harmony_model",
+                    token=os.getenv("HF_TOKEN")
+                )
+                print("Model loaded successfully")
+    return model
 
-def warmup_model():
+def warmup():
     try:
-        load_model_once()
+        get_model()
     except Exception as e:
-        print("❌ Warmup failed:", e)
+        print("Warmup failed:", e)
 
 @app.on_event("startup")
 def startup_event():
-    threading.Thread(target=warmup_model, daemon=True).start()
+    threading.Thread(target=warmup, daemon=True).start()
 
 @app.get("/health")
 def health():
@@ -40,8 +41,8 @@ def health():
 
 @app.post("/embed")
 def embed_texts(req: TextRequest):
-    load_model_once()
-    embeddings = model.encode(
+    model_instance = get_model()
+    embeddings = model_instance.encode(
         req.texts,
         normalize_embeddings=True
     ).tolist()
