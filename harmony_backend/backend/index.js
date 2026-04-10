@@ -4,7 +4,7 @@ const { CosmosClient } = require("@azure/cosmos");
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-
+const verifyAdminToken = require("./middleware/verifyAdminToken");
 const app = express();
 
 // ===== COSMOS =====
@@ -15,7 +15,7 @@ const client = new CosmosClient({
 
 const database = client.database("harmony-db");
 const container = database.container("eventParticipants");
-
+const eventsContainer = database.container("events");
 // ------ CACHE (REDIS) ------
 const { createClient } = require("redis");
 
@@ -141,7 +141,6 @@ app.post("/api/match/admin/rebuild-all/:eventId",verifyAdminToken,  async (req, 
   
   try {
     const eventId = req.params.eventId;
-    const adminId = req.adminAuth.providerUserId;
     const adminId = req.adminAuth.providerUserId;
     const { resource: event } = await eventsContainer.item(eventId, eventId).read();
 
