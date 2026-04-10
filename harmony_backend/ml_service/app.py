@@ -2,27 +2,35 @@ import os
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
+from sentence_transformers import SentenceTransformer
 
 app = FastAPI()
-
-model = None
 
 class TextRequest(BaseModel):
     texts: List[str]
 
-def get_model():
+model = None
+
+# 🚀 זה החלק החשוב
+@app.on_event("startup")
+def load_model():
     global model
-    if model is None:
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer(
-            "rayanmahmoud/harmony_model",
-            token=os.getenv("HF_TOKEN")
-        )
-        print("Model loaded successfully")
-    return model
+    model = SentenceTransformer(
+        "rayanmahmoud/harmony_model",
+        token=os.getenv("HF_TOKEN")
+    )
+    print("✅ Model loaded at startup")
+
+# (אופציונלי אבל חשוב)
+@app.get("/health")
+def health():
+    return {"ok": True}
 
 @app.post("/embed")
 def embed_texts(req: TextRequest):
-    model_instance = get_model()
-    embeddings = model_instance.encode(req.texts, normalize_embeddings=True).tolist()
+    embeddings = model.encode(
+        req.texts,
+        normalize_embeddings=True
+    ).tolist()
+
     return {"embeddings": embeddings}
