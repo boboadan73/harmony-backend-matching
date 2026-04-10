@@ -11,7 +11,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "jose": "^5.9.6"
+    "jose": "^5.9.6",
     "@azure/cosmos": "^4.9.2",
     "axios": "^1.13.2",
     "cors": "^2.8.6",
