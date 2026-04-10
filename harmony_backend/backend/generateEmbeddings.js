@@ -48,7 +48,7 @@ function removeStopwords(text) {
 
 async function getEmbeddings(texts) {
   const response = await axios.post(
-    "http://127.0.0.1:8000/embed",
+    "https://harmony-backend-matching.onrender.com/embed",
     { texts },
     { timeout: 60000 }
   );
