@@ -8,11 +8,16 @@ from typing import List
 # Create FastAPI app
 app = FastAPI()
 
-model = SentenceTransformer(
-    "rayanmahmoud/harmony_model",
-    token=os.getenv("HF_TOKEN")
-)
+model = None
 
+@app.on_event("startup")
+def load_model():
+    global model
+    model = SentenceTransformer(
+        "rayanmahmoud/harmony_model",
+        token=os.getenv("HF_TOKEN")
+    )
+    print("Model loaded successfully")
 print("Model loaded successfully")
 # Define request schema
 class TextRequest(BaseModel):
