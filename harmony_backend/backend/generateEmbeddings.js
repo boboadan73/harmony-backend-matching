@@ -47,14 +47,19 @@ function removeStopwords(text) {
 }
 
 async function getEmbeddings(texts) {
+  console.log("=== GET EMBEDDINGS RUNNING ===");
+  console.log("ML_SERVICE_URL =", process.env.ML_SERVICE_URL);
+  console.log("texts count =", texts.length);
+
   const response = await axios.post(
-     `${process.env.ML_SERVICE_URL}/embed`,
+    `${process.env.ML_SERVICE_URL}/embed`,
     { texts },
     { timeout: 300000 }
   );
+
+  console.log("=== ML RESPONSE RECEIVED ===");
   return response.data.embeddings;
 }
-
 
 async function getEmbeddingsBatched(texts, batchSize = 5) {
   const all = [];
