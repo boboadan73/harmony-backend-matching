@@ -35,50 +35,83 @@ function cosineSimilarity(a, b) {
 }
 
 /* ------------------ LLM ------------------ */
+const OpenAI = require("openai");
 
-const Groq = require("groq-sdk");
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
-
 function extractText(choice) {
   return (
     choice?.message?.content ??
     choice?.delta?.content ??
     null
   );
-}
+}async function callLLM(systemMessage, prompt, maxTokens) {
+  try {
+  console.log("🚀 Sending request...");
 
-async function callLLM(systemMessage, prompt, maxTokens = 2000) {
-  const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemMessage },
       { role: "user", content: prompt }
     ],
-    temperature: 0.7,
-    max_tokens: maxTokens
-  });
+    max_tokens: maxTokens,
+  
+  }, );
+
+  console.log("✅ Response received!");
 
   const text = extractText(completion?.choices?.[0]);
 
   return text
     ? text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim()
     : null;
-}
+
+} catch (err) {
+  console.error("❌ ERROR:", err.message);
+  return null;
+}}
+ 
+
+// const Groq = require("groq-sdk");
+
+// const groq = new Groq({
+//   apiKey: process.env.GROQ_API_KEY
+// });
+
+
+// async function callLLM(systemMessage, prompt, maxTokens = 2000) {
+//   const completion = await groq.chat.completions.create({
+//     model: "llama-3.3-70b-versatile",
+//     messages: [
+//       { role: "system", content: systemMessage },
+//       { role: "user", content: prompt }
+//     ],
+//     temperature: 0.3,
+//     max_tokens: maxTokens
+//   });
+
+//   const text = extractText(completion?.choices?.[0]);
+
+//   return text
+//     ? text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim()
+//     : null;
+// }
 
 function safeJsonParse(text) {
   try {
     return JSON.parse(text);
-  } catch (err) {
-    console.error("JSON parse failed - message:", err.message);
-    console.error("JSON parse failed - raw text:", text);
-    console.error("JSON parse failed - raw as json:", JSON.stringify(text));
-    return null;
+  } catch {
+    try {
+      // 🔥 ניסיון שני (JSON בתוך string)
+      return JSON.parse(JSON.parse(text));
+    } catch (err) {
+      console.error("JSON parse failed:", err.message);
+      return null;
+    }
   }
 }
-
 /* ------------------ Helpers ------------------ */
 
 function normalizeReasonLabel(field) {
@@ -150,10 +183,9 @@ async function explainMatches(participant, matches) {
 const systemMessage = `
 أنت تكتب شرحًا موجّهًا مباشرة إلى المستخدم نفسه.
 
+
 لغة الإخراج:
 - العربية فقط.
-- ممنوع تمامًا استخدام أي كلمة إنجليزية أو حروف لاتينية.
-- إذا ظهرت أي كلمة غير عربية، فالنتيجة خاطئة.
 
 طريقة الكتابة (إلزامية):
 - خاطب المستخدم بصيغة المخاطَب فقط: "أنت"، "لك"، "معك".
@@ -169,19 +201,35 @@ const systemMessage = `
 - ممنوع استخدام صيغ مثل:
   "فلان وفلان"، "كلاكما"، "الطرفين"، "الشخصين".
 - ممنوع استخدام لغة عامة أو إنشائية.
+- استخدم تفاصيل حقيقية من النص (مثل: مكان العمل، اسم شركة، مجال دقيق، نوع خبرة).
+- إذا كان هناك نفس المجال (مثل الطب، القانون، الهندسة)، وضّح الفرق أو التكامل:
+  (مثال: أنت تدرس الطب وهو يعمل في شركة طبية، أو أنت تركز على الجانب الأكاديمي وهو يعمل في التطبيق العملي).
+- اربط بينكما بطريقة تُظهر كيف يمكن أن تستفيد منه أو تتعاون معه.
+- تجنب العبارات العامة مثل "تشتركان في نفس المجال" بدون تفاصيل.
+- اجعل كل جملة تحمل قيمة حقيقية ومعلومة ملموسة.
+مثال (مهم جدًا):
 
-إخراج إضافي (مهم جدًا):
-- بعد كتابة الشرح بالعربية، قم بإرجاع نفس الشرح مترجمًا إلى:
-  - الإنجليزية (en)
-  - العبرية (he)
-- أرجع النتيجة بصيغة JSON فقط بالشكل التالي:
+المعطيات:
+- أنت تدرس الطب وتهتم بالبحث الأكاديمي.
+- الشخص الآخر يعمل في شركة طبية ويملك خبرة عملية في المجال.
+
+الإخراج المطلوب:
 
 {
-  "explanation": {
-    "ar": "...",
-    "en": "...",
-    "he": "..."
-  },
+  "explanation": "أنت تدرس الطب وتركز على الجانب الأكاديمي، بينما يعمل هذا الشخص في شركة طبية، مما يمنحك فرصة لفهم التطبيق العملي لما تتعلمه. خبرته المهنية يمكن أن تساعدك على ربط المعرفة النظرية بالتجربة الواقعية وتوسيع فهمك للمجال."
+}
+
+التزم بنفس الأسلوب، نفس مستوى التفاصيل، ونفس العمق.
+
+- أرجع النتيجة بصيغة JSON فقط بالشكل التالي:
+- يجب ترجمة/تحويل الاسم إلى الإنجليزية والعبرية بشكل صحيح.
+- لا يجوز ترك الاسم كما هو في جميع اللغات.
+- إذا كان الاسم عربي، قم بتحويله إلى:
+  - الإنجليزية (حروف لاتينية)
+  - العبرية (حروف عبرية)
+
+{
+  "explanation": "...",
   "target_name": {
     "ar": "...",
     "en": "...",
@@ -190,7 +238,8 @@ const systemMessage = `
   "match_name": {
     "ar": "...",
     "en": "...",
-    "he": ".
+    "he": "..."
+  },
 }
 
 - ممنوع كتابة أي نص خارج JSON
@@ -207,6 +256,14 @@ ${match.name || ""}
 - معلومات المشارك المقترح: ${primaryReason?.matchText || ""}
 
 
+السبب الثانوي:
+- المجال عندك: ${normalizeReasonLabel(secondaryReason?.fromField || "")}
+- المجال عند المشارك المقترح: ${normalizeReasonLabel(secondaryReason?.toField || "")}
+- معلوماتك: ${secondaryReason?.participantText || ""}
+- معلومات المشارك المقترح: ${secondaryReason?.matchText || ""}
+
+
+
 اسم المشارك الأساسي الذي يجب إرجاعه أيضًا داخل target_name.original:
 ${participant.name || ""}
 
@@ -216,62 +273,148 @@ ${match.name || ""}
 اكتب الشرح وفق التعليمات أعلاه.
 `.trim();
 
-const llmRaw = await callLLM(systemMessage, prompt, 5000);
 
-// console.log("llmRaw type:", typeof llmRaw);
-// console.log("llmRaw:", llmRaw);
-// console.log("llmRaw as json:", JSON.stringify(llmRaw));
-
+const llmRaw = await callLLM(systemMessage, prompt, 200);
 const parsed = llmRaw ? safeJsonParse(llmRaw) : null;
+console.log("RAW:", llmRaw);
+console.log("PARSED:", parsed);
 
-const explanation = parsed?.explanation
-  ? {
-      ar: parsed.explanation.ar || null,
-      en: parsed.explanation.en || null,
-      he: parsed.explanation.he || null,
-    }
-  : {
-      ar: null,
-      en: null,
-      he: null,
+let arabicExplanation = parsed?.explanation || null;
+
+
+// 🔥 fallback
+if (!arabicExplanation) {
+  arabicExplanation = llmRaw;
+}
+
+
+const targetName = parsed?.target_name || {
+      ar: participant.name,
+      en: participant.name,
+      he: participant.name,
     };
 
-const targetName = parsed?.target_name
-  ? {
-      ar: parsed.target_name.original || participant.name || null,
-      en: parsed.target_name.en || null,
-      he: parsed.target_name.he || null,
-    }
-  : {
-      ar: participant.name || null,
-      en: null,
-      he: null,
+const matchName = parsed?.match_name || {
+      ar: match.name,
+      en: match.name,
+      he: match.name,
     };
 
-const matchName = parsed?.match_name
-  ? {
-      ar: parsed.match_name.original || match.name || null,
-      en: parsed.match_name.en || null,
-      he: parsed.match_name.he || null,
-    }
-  : {
-      ar: match.name || null,
-      en: null,
-      he: null,
-    };
+let englishExplanation = null;
+let hebrewExplanation = null;
 
-  results.push({
-    matchId: match.id,
-    score: typeof match.score === "number" ? match.score : (primaryReason?.score ?? null),
-    explanation,
-    target_name: targetName,
-    match_name: matchName,
-  });
-  }
+if (arabicExplanation) {
+      [englishExplanation, hebrewExplanation] = await Promise.all([
+        translateToEnglish(arabicExplanation),
+        translateToHebrew(arabicExplanation)
+      ]);
+    }
+
+    const explanation = {
+      ar: arabicExplanation,
+      en: englishExplanation,
+      he: hebrewExplanation,
+    };
+     results.push({
+      matchId: match.id,
+      score: primaryReason?.score ?? null,
+      explanation,
+      target_name: targetName,
+      match_name: matchName,
+    });
+    }
 
   return results;
 }
 
+
+//--------------------------translations--------------------------
+
+async function translateToEnglish(text) {
+const systemMessage = `
+You are a professional translator from Arabic to English.
+
+Rules:
+- Translate the text accurately into natural English
+- Preserve the original meaning
+- Do not add or remove information
+- Keep names, organizations, and technical terms exactly as they appear
+- Do not explain anything
+
+Output:
+- Return ONLY the English translation
+- No extra text
+`.trim();
+
+ try {
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: text }
+      ],
+      temperature: 0,
+      max_tokens: 150
+    });
+
+    const result = extractText(completion?.choices?.[0]); // ✅ שינוי שם
+
+    return result
+      ? result.replace(/\n+/g, " ").trim()
+      : null;
+
+  } catch (err) {
+    console.error("❌ English translation error:", err.message);
+    return text;
+  }
+}
+
+async function translateToHebrew(text) {
+  const systemMessage = `
+אתה מתרגם מקצועי.
+
+המשימה שלך היא לתרגם את הטקסט הנתון מאנגלית לעברית באופן נאמן ומדויק.
+
+כללים מחייבים:
+- אין לשנות משמעות.
+- אין להוסיף מידע.
+- אין להסיר מידע.
+- אין לנסח מחדש.
+- אין לסכם.
+- אין לשנות גוף, זמן או נקודת מבט.
+- שמור על מבנה המשפטים והזרימה המקורית ככל האפשר.
+- שמור במדויק על שמות פרטיים, שמות חברות, מוסדות ומונחים מקצועיים.
+- אם מופיע טקסט באנגלית שאין לתרגם (כגון שמות), השאר אותו כפי שהוא.
+-תשים לב לזכר ונקבה , תכתוב בניסוח נכון.
+פלט:
+- החזר תרגום בלבד.
+- ללא הסברים, הערות או טקסט נוסף.
+`.trim();
+  try {
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: text }
+      ],
+      temperature: 0,
+      max_tokens: 150
+    });
+
+    const result = extractText(completion?.choices?.[0]); // ✅ שינוי שם
+
+    return result
+      ? result.replace(/\n+/g, " ").trim()
+      : null;
+
+  } catch (err) {
+    console.error("❌ Translation error:", err.message);
+    return text;
+  }
+
+
+}
+
+
 // Export explanation function for use in API routes
 module.exports = { explainMatches };
-
