@@ -46,49 +46,57 @@ const { generateProfileEmbedding,  } = require("./generateEmbeddings");
 const { explainMatches,  } = require("./llmExplanation");
 
 async function handleParticipantMatchesOnly(participantId, resources, k = 5) {
-  if (!resources || resources.length === 0) {
-    throw new Error("No participants found");
-  }
+  let target;
 
-  // Keep only participants with valid embeddings
-  const participants = resources.filter(
-    (p) => Array.isArray(p.profile_embedding) && p.profile_embedding.length > 0
-  );
+  try {
+    if (!resources || resources.length === 0) {
+      throw new Error("No participants found");
+    }
 
-  // Find target participant by exact stored ID format
-  const target = participants.find(
-    (p) => p.id === participantId
-  );
-
-  if (!target) {
-    throw new Error(
-      `Participant ${participantId} not found or has no profile embedding`
+    // Keep only participants with valid embeddings
+    const participants = resources.filter(
+      (p) => Array.isArray(p.profile_embedding) && p.profile_embedding.length > 0
     );
-  }
 
-  const matches = participants
-    .filter((p) => p.id !== participantId)
-    .map((p) => {
-      const score = cosineSimilarity(
-        target.profile_embedding,
-        p.profile_embedding
+    // Find target participant by exact stored ID format
+    target = participants.find(
+      (p) => String(p.id) === String(participantId)
+    );
+
+    if (!target) {
+      throw new Error(
+        `Participant ${participantId} not found or has no profile embedding`
       );
+    }
 
-     return {
-      ...p,   // 🔥 כל השדות של המשתתף
-      score
-    };
-      
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k);
+    const matches = participants
+      .filter((p) => String(p.id) !== String(participantId))
+      .map((p) => {
+        const score = cosineSimilarity(
+          target.profile_embedding,
+          p.profile_embedding
+        );
 
+       return {
+        ...p,   // 🔥 כל השדות של המשתתף
+        score
+      };
+        
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, k);
 
-  console.log(`Computed ${matches.length} matches for participant ${participantId}`);
+    console.log(`Computed ${matches.length} matches for participant ${participantId}`);
 
-  const result = await explainMatches(target, matches);
+    const result = await explainMatches(target, matches);
 
-  return result;
+    return result;
+  } catch (err) {
+    // If something fails, release the lock
+    target.status = "pending";
+    await container.items.upsert(target);
+    throw err;
+  }
 }
 
 async function handleParticipant(participant, eventId, k = 5) {

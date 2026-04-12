@@ -164,6 +164,12 @@ if (event.createdByAdminId !== adminId) {
       return res.status(404).json({ error: "No participants found for this event" });
     }
 
+     // Mark all participants in this event as processing
+    for (const participant of resources) {
+      participant.status = "pending";
+      await container.items.upsert(participant);
+    }
+
     // Stop if any participant is already being processed
     const alreadyProcessing = resources.find((p) => p.status === "processing");
     if (alreadyProcessing) {
@@ -253,6 +259,8 @@ app.post("/api/match/admin/update/:eventId/:id", verifyAdminToken, async (req, r
     delete participant.profile_embedding;
     //await deleteMatchCache(eventId, participant.id); // delete cache for this participant
 
+    await deleteMatchCache(eventId, participant.id); // delete cache for this participant
+
     // Mark participant as needing recalculation
     participant.status = "pending";
 
@@ -303,6 +311,8 @@ app.get("/api/match/update/:eventId/:id", async (req, res) => {
     delete participant.profile_text;
     delete participant.profile_embedding;
     //await deleteMatchCache(eventId, participant.id); // delete cache for this participant
+
+    await deleteMatchCache(eventId, participant.id); // delete cache for this participant
 
     // Mark participant as needing recalculation
     participant.status = "pending";
