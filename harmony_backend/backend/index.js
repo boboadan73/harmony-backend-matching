@@ -199,7 +199,7 @@ if (event.createdByAdminId !== adminId) {
 
 // Compute matches for each participant, save to cache, and mark as ready
   for (const participant of resources) {
-  const matches = await handleParticipantMatchesOnly(participant.id, resources, 5);
+  const matches = await handleParticipantMatchesOnly(participant, resources, 5);
   await setMatchCache(eventId, participant.id, matches);
 
   participant.status = "ready";

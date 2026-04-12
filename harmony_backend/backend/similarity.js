@@ -45,7 +45,7 @@ function cosineSimilarity(a, b) {
 const { generateProfileEmbedding,  } = require("./generateEmbeddings");
 const { explainMatches,  } = require("./llmExplanation");
 
-async function handleParticipantMatchesOnly(participantId, resources, k = 5) {
+async function handleParticipantMatchesOnly(participant, resources, k = 5) {
   let target;
 
   try {
@@ -58,22 +58,11 @@ async function handleParticipantMatchesOnly(participantId, resources, k = 5) {
       (p) => Array.isArray(p.profile_embedding) && p.profile_embedding.length > 0
     );
 
-    // Find target participant by exact stored ID format
-    target = participants.find(
-      (p) => String(p.id) === String(participantId)
-    );
-
-    if (!target) {
-      throw new Error(
-        `Participant ${participantId} not found or has no profile embedding`
-      );
-    }
 
     const matches = participants
-      .filter((p) => String(p.id) !== String(participantId))
       .map((p) => {
         const score = cosineSimilarity(
-          target.profile_embedding,
+          participant.profile_embedding,
           p.profile_embedding
         );
 
@@ -86,15 +75,15 @@ async function handleParticipantMatchesOnly(participantId, resources, k = 5) {
       .sort((a, b) => b.score - a.score)
       .slice(0, k);
 
-    console.log(`Computed ${matches.length} matches for participant ${participantId}`);
+    console.log(`Computed ${matches.length} matches for participant ${participant.id}`);
 
-    const result = await explainMatches(target, matches);
+    const result = await explainMatches(participant, matches);
 
     return result;
   } catch (err) {
     // If something fails, release the lock
-    target.status = "pending";
-    await container.items.upsert(target);
+    participant.status = "pending";
+    await container.items.upsert(participant);
     throw err;
   }
 }
