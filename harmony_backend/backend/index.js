@@ -168,6 +168,16 @@ if (event.createdByAdminId !== adminId) {
     for (const participant of resources) {
       participant.status = "pending";
       await container.items.upsert(participant);
+      delete participant.job_clean;
+      delete participant.academic_clean;
+      delete participant.professional_clean;
+      delete participant.personal_clean;
+      delete participant.profile_text;
+      delete participant.profile_embedding;
+      delete participant.job_embedding;
+      delete participant.academic_embedding;
+      delete participant.professional_embedding;
+      delete participant.personal_embedding;
     }
 
     // Stop if any participant is already being processed
@@ -255,8 +265,16 @@ app.post("/api/match/admin/update/:eventId/:id", verifyAdminToken, async (req, r
     const participant = resources[0];
 
     // Remove old matching fields if they exist
+    delete participant.job_clean;
+    delete participant.academic_clean;
+    delete participant.professional_clean;
+    delete participant.personal_clean;
     delete participant.profile_text;
     delete participant.profile_embedding;
+    delete participant.job_embedding;
+    delete participant.academic_embedding;
+    delete participant.professional_embedding;
+    delete participant.personal_embedding;
     //await deleteMatchCache(eventId, participant.id); // delete cache for this participant
 
     await deleteMatchCache(eventId, participant.id); // delete cache for this participant
@@ -306,10 +324,20 @@ app.get("/api/match/update/:eventId/:id", async (req, res) => {
     }
 
     const participant = resources[0];
+  
 
     // Remove old matching fields if they exist
+   
+    delete participant.job_clean;
+    delete participant.academic_clean;
+    delete participant.professional_clean;
+    delete participant.personal_clean;
     delete participant.profile_text;
     delete participant.profile_embedding;
+    delete participant.job_embedding;
+    delete participant.academic_embedding;
+    delete participant.professional_embedding;
+    delete participant.personal_embedding;
     //await deleteMatchCache(eventId, participant.id); // delete cache for this participant
 
     await deleteMatchCache(eventId, participant.id); // delete cache for this participant
