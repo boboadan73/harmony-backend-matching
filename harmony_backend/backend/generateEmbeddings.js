@@ -122,48 +122,48 @@ async function AllEmbeddings(resources, eventId) {
 
   console.log(`Loaded ${resources.length} participants from Cosmos for event ${eventId}`);
 
-  for (let idx = 0; idx < resources.length; idx++) {
-    const p = resources[idx];
+  await Promise.all(
+    resources.map(async (p, idx) => {
+      const jobText = removeStopwords(normalizeText(p.jobTitle || ""));
+      const academicText = removeStopwords(normalizeText(p.academicResume || ""));
+      const professionalText = removeStopwords(normalizeText(p.professionalResume || ""));
+      const personalText = removeStopwords(normalizeText(p.personalResume || ""));
 
-    const jobText = removeStopwords(normalizeText(p.jobTitle || ""));
-    const academicText = removeStopwords(normalizeText(p.academicResume || ""));
-    const professionalText = removeStopwords(normalizeText(p.professionalResume || ""));
-    const personalText = removeStopwords(normalizeText(p.personalResume || ""));
+      const profileText = [jobText, academicText, professionalText, personalText]
+        .filter(Boolean)
+        .join(" ");
 
-    const profileText = [jobText, academicText, professionalText, personalText]
-      .filter(Boolean)
-      .join(" ");
+      const texts = [
+        jobText || " ",
+        academicText || " ",
+        professionalText || " ",
+        personalText || " ",
+        profileText || " "
+      ];
 
-    const texts = [
-      jobText || " ",
-      academicText || " ",
-      professionalText || " ",
-      personalText || " ",
-      profileText || " "
-    ];
+      const embeddings = await getEmbeddingsBatched(texts, 5);
 
-    const embeddings = await getEmbeddingsBatched(texts, 5);
+      const updatedDoc = {
+        ...p,
 
-    const updatedDoc = {
-      ...p,
+        job_clean: jobText,
+        academic_clean: academicText,
+        professional_clean: professionalText,
+        personal_clean: personalText,
 
-      job_clean: jobText,
-      academic_clean: academicText,
-      professional_clean: professionalText,
-      personal_clean: personalText,
+        profile_text: profileText,
 
-      profile_text: profileText,
+        job_embedding: embeddings[0],
+        academic_embedding: embeddings[1],
+        professional_embedding: embeddings[2],
+        personal_embedding: embeddings[3],
+        profile_embedding: embeddings[4],
+      };
 
-      job_embedding: embeddings[0],
-      academic_embedding: embeddings[1],
-      professional_embedding: embeddings[2],
-      personal_embedding: embeddings[3],
-      profile_embedding: embeddings[4],
-    };
-
-    await container.items.upsert(updatedDoc);
-    console.log(`Updated ${idx + 1}/${resources.length}: ${p.id}`);
-  }
+      await container.items.upsert(updatedDoc);
+      console.log(`Updated ${idx + 1}/${resources.length}: ${p.id}`);
+    })
+  );
 
   console.log(`Done embeddings for event ${eventId}.`);
 }

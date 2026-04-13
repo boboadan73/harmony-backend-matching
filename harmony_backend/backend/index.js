@@ -81,18 +81,6 @@ async function deleteMatchCache(eventId, targetId) {
 
   console.log("Cache deleted:", key);
 }
-// =====================================
-// EMBEDDINGS
-// =====================================
-
-// add our model ?????????????????????????????
-async function getEmbeddings(texts) {
-  const response = await axios.post(
-    'https://harmony-ml.onrender.com/embed',
-    { texts }
-  );
-  return response.data.embeddings;
-}
 
 
 // =====================================
@@ -139,7 +127,7 @@ const { AllEmbeddings } = require("./generateEmbeddings");
 // =====================================
 app.post("/api/match/admin/rebuild-all/:eventId",verifyAdminToken,  async (req, res) => {
   
-  try {
+try {
     const eventId = req.params.eventId;
     const adminId = req.adminAuth.providerUserId;
     const { resource: event } = await eventsContainer.item(eventId, eventId).read();
@@ -153,61 +141,67 @@ if (event.createdByAdminId !== adminId) {
 }
 
 
-    const querySpec = {
+const querySpec = {
       query: "SELECT * FROM c WHERE c.eventId = @eventId",
       parameters: [{ name: "@eventId", value: eventId }],
     };
 
-    const { resources } = await container.items.query(querySpec).fetchAll();
+const { resources } = await container.items.query(querySpec).fetchAll();
 
-    if (!resources || resources.length === 0) {
+if (!resources || resources.length === 0) {
       return res.status(404).json({ error: "No participants found for this event" });
     }
 
      // Mark all participants in this event as processing
-    for (const participant of resources) {
-      participant.status = "pending";
-      await container.items.upsert(participant);
-      delete participant.job_clean;
-      delete participant.academic_clean;
-      delete participant.professional_clean;
-      delete participant.personal_clean;
-      delete participant.profile_text;
-      delete participant.profile_embedding;
-      delete participant.job_embedding;
-      delete participant.academic_embedding;
-      delete participant.professional_embedding;
-      delete participant.personal_embedding;
-    }
+await Promise.all(
+  resources.map(async (participant) => {
+    participant.status = "pending";
+    delete participant.job_clean;
+    delete participant.academic_clean;
+    delete participant.professional_clean;
+    delete participant.personal_clean;
+    delete participant.profile_text;
+    delete participant.profile_embedding;
+    delete participant.job_embedding;
+    delete participant.academic_embedding;
+    delete participant.professional_embedding;
+    delete participant.personal_embedding;
+    await container.items.upsert(participant);
+  })
+);
 
     // Stop if any participant is already being processed
-    const alreadyProcessing = resources.find((p) => p.status === "processing");
-    if (alreadyProcessing) {
+const alreadyProcessing = resources.find((p) => p.status === "processing");
+if (alreadyProcessing) {
       return res.status(409).json({
         error: `Participant ${alreadyProcessing.id} is already being processed`,
       });
     }
 
-    // Mark all participants in this event as processing
-    for (const participant of resources) {
-      participant.status = "processing";
-      await container.items.upsert(participant);
-    }
+// Mark all participants in this event as processing
+await Promise.all(
+  resources.map(async (participant) => {
+    participant.status = "processing";
+    await container.items.upsert(participant);
+  })
+);
 
-    // Rebuild embeddings for this event
-    await AllEmbeddings(resources, eventId);
+// Rebuild embeddings for this event
+await AllEmbeddings(resources, eventId);
 
 // Compute matches for each participant, save to cache, and mark as ready
-  for (const participant of resources) {
-  const matches = await handleParticipantMatchesOnly(participant, resources, 5);
-  await setMatchCache(eventId, participant.id, matches);
+await Promise.all(
+  resources.map(async (participant) => {
+    const matches = await handleParticipantMatchesOnly(participant, resources, 5);
+    await setMatchCache(eventId, participant.id, matches);
 
-  participant.status = "ready";
-  await container.items.upsert(participant);
-}
+    participant.status = "ready";
+    await container.items.upsert(participant);
+  })
+);
 
-    res.json({
-      message: "All embeddings rebuilt and all participants were processed successfully",
+res.json({
+      message: "all participants were processed successfully",
       eventId,
       totalParticipants: resources.length,
     });
