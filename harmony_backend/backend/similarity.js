@@ -76,6 +76,10 @@ async function handleParticipantMatchesOnly(participant, resources, k = 5) {
       .slice(0, k);
 
     console.log(`Computed ${matches.length} matches for participant ${participant.id}`);
+    console.log("========== DEBUG ==========");
+    console.log("Participant:", participant.id);
+    console.log("Matches length:", matches.length);
+    console.log("===========================");
 
     const result = await explainMatches(participant, matches);
 
