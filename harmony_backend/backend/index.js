@@ -170,7 +170,7 @@ if (!resources || resources.length === 0) {
 //   })
 // );
 
-const participantBatch = 10;
+const participantBatch = 5;
 
 for (let start = 0; start < resources.length; start += participantBatch) {
   const batch = resources.slice(start, start + participantBatch);
