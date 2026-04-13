@@ -153,22 +153,36 @@ if (!resources || resources.length === 0) {
     }
 
 // Mark all participants in this event as processing
-await Promise.all(
-  resources.map(async (participant) => {
-    participant.status = "pending";
-    delete participant.job_clean;
-    delete participant.academic_clean;
-    delete participant.professional_clean;
-    delete participant.personal_clean;
-    delete participant.profile_text;
-    delete participant.profile_embedding;
-    delete participant.job_embedding;
-    delete participant.academic_embedding;
-    delete participant.professional_embedding;
-    delete participant.personal_embedding;
-    await container.items.upsert(participant);
-  })
-);
+// await Promise.all(
+//   resources.map(async (participant) => {
+//     participant.status = "pending";
+//     delete participant.job_clean;
+//     delete participant.academic_clean;
+//     delete participant.professional_clean;
+//     delete participant.personal_clean;
+//     delete participant.profile_text;
+//     delete participant.profile_embedding;
+//     delete participant.job_embedding;
+//     delete participant.academic_embedding;
+//     delete participant.professional_embedding;
+//     delete participant.personal_embedding;
+//     await container.items.upsert(participant);
+//   })
+// );
+
+for (const participant of resources) 
+  { participant.status = "pending"; 
+    await container.items.upsert(participant); 
+    delete participant.job_clean; 
+    delete participant.academic_clean; 
+    delete participant.professional_clean; 
+    delete participant.personal_clean; 
+    delete participant.profile_text; 
+    delete participant.profile_embedding; 
+    delete participant.job_embedding; 
+    delete participant.academic_embedding; 
+    delete participant.professional_embedding; 
+    delete participant.personal_embedding; }
 
 // Stop if any participant is already being processed
 const alreadyProcessing = resources.find((p) => p.status === "processing");
@@ -179,12 +193,18 @@ if (alreadyProcessing) {
     }
 
 // Mark all participants in this event as processing
-await Promise.all(
-  resources.map(async (participant) => {
-    participant.status = "processing";
-    await container.items.upsert(participant);
-  })
-);
+// await Promise.all(
+//   resources.map(async (participant) => {
+//     participant.status = "processing";
+//     await container.items.upsert(participant);
+//   })
+// );
+
+// Mark all participants in this event as processing 
+for (const participant of resources)
+  { participant.status = "processing"; 
+    await container.items.upsert(participant); 
+  }
 
 // Rebuild embeddings for this event
 await AllEmbeddings(resources, eventId);
