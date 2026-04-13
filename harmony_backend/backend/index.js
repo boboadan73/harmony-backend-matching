@@ -49,13 +49,29 @@ async function ensureRedisConnected() {
 }
 
 
+
+
 function matchCacheKey(eventId, targetId) {
   return `match:${eventId}:${targetId}`;
 }
 
-async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 60 * 24 * 30) {
-  await ensureRedisConnected();
+// async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 60 * 24 * 30) {
+//   await ensureRedisConnected();
 
+//   const key = matchCacheKey(eventId, targetId);
+
+//   const payload = {
+//     targetId,
+//     matches,
+//   };
+
+//   await redis.set(key, JSON.stringify(payload), {
+//     EX: ttlSeconds,
+//   });
+// }
+
+
+async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 60 * 24 * 30) {
   const key = matchCacheKey(eventId, targetId);
 
   const payload = {
@@ -63,9 +79,21 @@ async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 60 * 
     matches,
   };
 
-  await redis.set(key, JSON.stringify(payload), {
-    EX: ttlSeconds,
-  });
+  try {
+    await ensureRedisConnected();
+    await redis.set(key, JSON.stringify(payload), {
+      EX: ttlSeconds,
+    });
+  } catch (err) {
+    console.error("setMatchCache failed:", err.message);
+
+    redisConnectPromise = null;
+
+    await ensureRedisConnected();
+    await redis.set(key, JSON.stringify(payload), {
+      EX: ttlSeconds,
+    });
+  }
 }
 
 async function getMatchCache(eventId, targetId) {
@@ -221,7 +249,7 @@ for (let start = 0; start < resources.length; start += BatchSize) {
 await AllEmbeddings(resources, eventId);
 
 // Compute matches for each participant, save to cache, and mark as ready
-const participantBatchSize = 1;
+const participantBatchSize = 3;
 
 for (let start = 0; start < resources.length; start += participantBatchSize) {
   const batch = resources.slice(start, start + participantBatchSize);
