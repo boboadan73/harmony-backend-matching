@@ -122,48 +122,56 @@ async function AllEmbeddings(resources, eventId) {
 
   console.log(`Loaded ${resources.length} participants from Cosmos for event ${eventId}`);
 
-  await Promise.all(
-    resources.map(async (p, idx) => {
-      const jobText = removeStopwords(normalizeText(p.jobTitle || ""));
-      const academicText = removeStopwords(normalizeText(p.academicResume || ""));
-      const professionalText = removeStopwords(normalizeText(p.professionalResume || ""));
-      const personalText = removeStopwords(normalizeText(p.personalResume || ""));
+  const participantBatchSize = 3;
 
-      const profileText = [jobText, academicText, professionalText, personalText]
-        .filter(Boolean)
-        .join(" ");
+  for (let start = 0; start < resources.length; start += participantBatchSize) {
+    const batch = resources.slice(start, start + participantBatchSize);
 
-      const texts = [
-        jobText || " ",
-        academicText || " ",
-        professionalText || " ",
-        personalText || " ",
-        profileText || " "
-      ];
+    await Promise.all(
+      batch.map(async (p, batchIdx) => {
+        const idx = start + batchIdx;
 
-      const embeddings = await getEmbeddingsBatched(texts, 5);
+        const jobText = removeStopwords(normalizeText(p.jobTitle || ""));
+        const academicText = removeStopwords(normalizeText(p.academicResume || ""));
+        const professionalText = removeStopwords(normalizeText(p.professionalResume || ""));
+        const personalText = removeStopwords(normalizeText(p.personalResume || ""));
 
-      const updatedDoc = {
-        ...p,
+        const profileText = [jobText, academicText, professionalText, personalText]
+          .filter(Boolean)
+          .join(" ");
 
-        job_clean: jobText,
-        academic_clean: academicText,
-        professional_clean: professionalText,
-        personal_clean: personalText,
+        const texts = [
+          jobText || " ",
+          academicText || " ",
+          professionalText || " ",
+          personalText || " ",
+          profileText || " "
+        ];
 
-        profile_text: profileText,
+        const embeddings = await getEmbeddingsBatched(texts, 5);
 
-        job_embedding: embeddings[0],
-        academic_embedding: embeddings[1],
-        professional_embedding: embeddings[2],
-        personal_embedding: embeddings[3],
-        profile_embedding: embeddings[4],
-      };
+        const updatedDoc = {
+          ...p,
 
-      await container.items.upsert(updatedDoc);
-      console.log(`Updated ${idx + 1}/${resources.length}: ${p.id}`);
-    })
-  );
+          job_clean: jobText,
+          academic_clean: academicText,
+          professional_clean: professionalText,
+          personal_clean: personalText,
+
+          profile_text: profileText,
+
+          job_embedding: embeddings[0],
+          academic_embedding: embeddings[1],
+          professional_embedding: embeddings[2],
+          personal_embedding: embeddings[3],
+          profile_embedding: embeddings[4],
+        };
+
+        await container.items.upsert(updatedDoc);
+        console.log(`Updated ${idx + 1}/${resources.length}: ${p.id}`);
+      })
+    );
+  }
 
   console.log(`Done embeddings for event ${eventId}.`);
 }

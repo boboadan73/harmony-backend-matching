@@ -200,25 +200,39 @@ if (alreadyProcessing) {
 //   })
 // );
 
-// Mark all participants in this event as processing 
-for (const participant of resources)
-  { participant.status = "processing"; 
-    await container.items.upsert(participant); 
-  }
+// Mark all participants in this event as processing
+const BatchSize = 10;
+
+for (let start = 0; start < resources.length; start += BatchSize) {
+  const batch = resources.slice(start, start + BatchSize);
+
+  await Promise.all(
+    batch.map(async (participant) => {
+      participant.status = "processing";
+      await container.items.upsert(participant);
+    })
+  );
+}
 
 // Rebuild embeddings for this event
 await AllEmbeddings(resources, eventId);
 
 // Compute matches for each participant, save to cache, and mark as ready
-await Promise.all(
-  resources.map(async (participant) => {
-    const matches = await handleParticipantMatchesOnly(participant, resources, 5);
-    await setMatchCache(eventId, participant.id, matches);
+const participantBatchSize = 3;
 
-    participant.status = "ready";
-    await container.items.upsert(participant);
-  })
-);
+for (let start = 0; start < resources.length; start += participantBatchSize) {
+  const batch = resources.slice(start, start + participantBatchSize);
+
+  await Promise.all(
+    batch.map(async (participant) => {
+      const matches = await handleParticipantMatchesOnly(participant, resources, 5);
+      await setMatchCache(eventId, participant.id, matches);
+
+      participant.status = "ready";
+      await container.items.upsert(participant);
+    })
+  );
+}
 
 res.json({
       message: "all participants were processed successfully",
