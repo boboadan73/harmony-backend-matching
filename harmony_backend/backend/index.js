@@ -29,12 +29,23 @@ redis.on("error", (err) => {
 
 let redisReady = false;
 
+let redisConnectPromise = null;
+
 async function ensureRedisConnected() {
-  if (!redisReady) {
-    await redis.connect();
-    redisReady = true;
-    console.log("Redis connected");
+  if (redis.isOpen) return;
+
+  if (!redisConnectPromise) {
+    redisConnectPromise = redis.connect()
+      .then(() => {
+        console.log("Redis connected");
+      })
+      .catch((err) => {
+        redisConnectPromise = null;
+        throw err;
+      });
   }
+
+  await redisConnectPromise;
 }
 
 
