@@ -167,7 +167,11 @@ async function AllEmbeddings(resources, eventId) {
           profile_embedding: embeddings[4],
         };
 
-        await container.items.upsert(updatedDoc);
+       
+        await container.items.upsert(updatedDoc, {
+         partitionKey: p.eventId
+       });
+       Object.assign(p, updatedDoc); 
         console.log(`Updated ${idx + 1}/${resources.length}: ${p.id}`);
       })
     );
