@@ -170,7 +170,7 @@ if (!resources || resources.length === 0) {
 //   })
 // );
 
-const participantBatch = 20;
+const participantBatch = 10;
 
 for (let start = 0; start < resources.length; start += participantBatch) {
   const batch = resources.slice(start, start + participantBatch);
@@ -210,7 +210,7 @@ if (alreadyProcessing) {
 // );
 
 // Mark all participants in this event as processing
-const BatchSize = 20;
+const BatchSize = 10;
 
 for (let start = 0; start < resources.length; start += BatchSize) {
   const batch = resources.slice(start, start + BatchSize);
