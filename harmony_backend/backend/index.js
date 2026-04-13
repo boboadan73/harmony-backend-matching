@@ -170,19 +170,28 @@ if (!resources || resources.length === 0) {
 //   })
 // );
 
-for (const participant of resources) 
-  { participant.status = "pending"; 
-    await container.items.upsert(participant); 
-    delete participant.job_clean; 
-    delete participant.academic_clean; 
-    delete participant.professional_clean; 
-    delete participant.personal_clean; 
-    delete participant.profile_text; 
-    delete participant.profile_embedding; 
-    delete participant.job_embedding; 
-    delete participant.academic_embedding; 
-    delete participant.professional_embedding; 
-    delete participant.personal_embedding; }
+const participantBatch = 20;
+
+for (let start = 0; start < resources.length; start += participantBatch) {
+  const batch = resources.slice(start, start + participantBatch);
+
+  await Promise.all(
+    batch.map(async (participant) => {
+      participant.status = "pending";
+      delete participant.job_clean;
+      delete participant.academic_clean;
+      delete participant.professional_clean;
+      delete participant.personal_clean;
+      delete participant.profile_text;
+      delete participant.profile_embedding;
+      delete participant.job_embedding;
+      delete participant.academic_embedding;
+      delete participant.professional_embedding;
+      delete participant.personal_embedding;
+      await container.items.upsert(participant);
+    })
+  );
+}
 
 // Stop if any participant is already being processed
 const alreadyProcessing = resources.find((p) => p.status === "processing");
@@ -201,7 +210,7 @@ if (alreadyProcessing) {
 // );
 
 // Mark all participants in this event as processing
-const BatchSize = 10;
+const BatchSize = 20;
 
 for (let start = 0; start < resources.length; start += BatchSize) {
   const batch = resources.slice(start, start + BatchSize);
