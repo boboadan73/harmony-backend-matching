@@ -163,46 +163,29 @@ if (!resources || resources.length === 0) {
       return res.status(404).json({ error: "No participants found for this event" });
     }
 
-// Mark all participants in this event as processing
-// await Promise.all(
-//   resources.map(async (participant) => {
-//     participant.status = "pending";
-//     delete participant.job_clean;
-//     delete participant.academic_clean;
-//     delete participant.professional_clean;
-//     delete participant.personal_clean;
-//     delete participant.profile_text;
-//     delete participant.profile_embedding;
-//     delete participant.job_embedding;
-//     delete participant.academic_embedding;
-//     delete participant.professional_embedding;
-//     delete participant.personal_embedding;
-//     await container.items.upsert(participant);
-//   })
-// );
 
-const participantBatch = 5;
+// const participantBatch = 5;
 
-for (let start = 0; start < resources.length; start += participantBatch) {
-  const batch = resources.slice(start, start + participantBatch);
+// for (let start = 0; start < resources.length; start += participantBatch) {
+//   const batch = resources.slice(start, start + participantBatch);
 
-  await Promise.all(
-    batch.map(async (participant) => {
-      participant.status = "pending";
-      delete participant.job_clean;
-      delete participant.academic_clean;
-      delete participant.professional_clean;
-      delete participant.personal_clean;
-      delete participant.profile_text;
-      delete participant.profile_embedding;
-      delete participant.job_embedding;
-      delete participant.academic_embedding;
-      delete participant.professional_embedding;
-      delete participant.personal_embedding;
-      await container.items.upsert(participant);
-    })
-  );
-}
+//   await Promise.all(
+//     batch.map(async (participant) => {
+//       participant.status = "pending";
+//       delete participant.job_clean;
+//       delete participant.academic_clean;
+//       delete participant.professional_clean;
+//       delete participant.personal_clean;
+//       delete participant.profile_text;
+//       delete participant.profile_embedding;
+//       delete participant.job_embedding;
+//       delete participant.academic_embedding;
+//       delete participant.professional_embedding;
+//       delete participant.personal_embedding;
+//       await container.items.upsert(participant);
+//     })
+//   );
+// }
 
 // Stop if any participant is already being processed
 const alreadyProcessing = resources.find((p) => p.status === "processing");
