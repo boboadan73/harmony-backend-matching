@@ -42,6 +42,10 @@ async function importExcel() {
         iWantToMeet: row["تود التعارف مع"] || row["I Want To Meet"] || "",
         photoUrl: row["thumbnail_url"] || row["Unnamed: 1"] || "",
         rawData: row,
+        hidden: false,
+        saved: [],
+        met: [],
+        skipped: [],
       };
 
       await container.items.upsert(participant);
