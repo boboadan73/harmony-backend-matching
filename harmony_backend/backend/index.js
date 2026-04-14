@@ -249,7 +249,7 @@ for (let start = 0; start < resources.length; start += BatchSize) {
 await AllEmbeddings(resources, eventId);
 
 // Compute matches for each participant, save to cache, and mark as ready
-const participantBatchSize = 10;
+const participantBatchSize = 20;
 
 for (let start = 0; start < resources.length; start += participantBatchSize) {
   const batch = resources.slice(start, start + participantBatchSize);
