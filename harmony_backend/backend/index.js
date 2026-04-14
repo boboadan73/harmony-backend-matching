@@ -2,6 +2,10 @@ require("dotenv").config();
 
 const { CosmosClient } = require("@azure/cosmos");
 const express = require("express");
+
+const axios = require("axios");
+const verifyAdminToken = require("./middleware/verifyAdminToken");
+const app = express();
 const cors = require("cors");
 
 app.use(cors({
@@ -12,9 +16,6 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
-const axios = require("axios");
-const verifyAdminToken = require("./middleware/verifyAdminToken");
-const app = express();
 
 // ===== COSMOS =====
 const client = new CosmosClient({
