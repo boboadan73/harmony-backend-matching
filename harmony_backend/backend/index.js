@@ -71,7 +71,7 @@ function matchCacheKey(eventId, targetId) {
 // }
 
 
-async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 60 * 24 * 30) {
+async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 15) {
   const key = matchCacheKey(eventId, targetId);
 
   const payload = {
