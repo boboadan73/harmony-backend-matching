@@ -37,20 +37,28 @@ function cosineSimilarity(a, b) {
 /* ------------------ LLM ------------------ */
 const OpenAI = require("openai");
 
-const client = new OpenAI({
+const clientExplanation = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const clientTranslator = new OpenAI({
+  apiKey: process.env.OPENAI_API_NEW_KEY,
+});
+
+
 function extractText(choice) {
   return (
     choice?.message?.content ??
     choice?.delta?.content ??
     null
   );
-}async function callLLM(systemMessage, prompt, maxTokens) {
+}
+
+async function callLLM(systemMessage, prompt, maxTokens) {
   try {
   console.log("🚀 Sending request...");
 
-  const completion = await client.chat.completions.create({
+  const completion = await clientExplanation.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemMessage },
@@ -74,44 +82,10 @@ function extractText(choice) {
 }}
  
 
-// const Groq = require("groq-sdk");
-
-// const groq = new Groq({
-//   apiKey: process.env.GROQ_API_KEY
-// });
 
 
-// async function callLLM(systemMessage, prompt, maxTokens = 2000) {
-//   const completion = await groq.chat.completions.create({
-//     model: "llama-3.3-70b-versatile",
-//     messages: [
-//       { role: "system", content: systemMessage },
-//       { role: "user", content: prompt }
-//     ],
-//     temperature: 0.3,
-//     max_tokens: maxTokens
-//   });
 
-//   const text = extractText(completion?.choices?.[0]);
 
-//   return text
-//     ? text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim()
-//     : null;
-// }
-
-function safeJsonParse(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    try {
-      // 🔥 ניסיון שני (JSON בתוך string)
-      return JSON.parse(JSON.parse(text));
-    } catch (err) {
-      console.error("JSON parse failed:", err.message);
-      return null;
-    }
-  }
-}
 /* ------------------ Helpers ------------------ */
 
 function normalizeReasonLabel(field) {
@@ -135,18 +109,20 @@ function getFieldText(person, field) {
   return (map[field] || "").trim();
 }
 
+
+
 /* ------------------ MAIN ------------------ */
 
 async function explainMatches(participant, matches) {
-  if (!participant) throw new Error("Participant not provided");
-  if (!Array.isArray(matches)) throw new Error("Matches must be an array");
+if (!participant) throw new Error("Participant not provided");
+if (!Array.isArray(matches)) throw new Error("Matches must be an array");
 
-  const results = [];
+const results = [];
 
-  for (const match of matches) {
-    if (!match) continue;
+for (const match of matches) {
+  if (!match) continue;
 
-    const fieldScores = {
+  const fieldScores = {
       jobTitle_to_jobTitle: cosineSimilarity(participant.job_embedding || [], match.job_embedding || []),
       academic_to_academic: cosineSimilarity(participant.academic_embedding || [], match.academic_embedding || []),
       professional_to_professional: cosineSimilarity(participant.professional_embedding || [], match.professional_embedding || []),
@@ -183,10 +159,8 @@ async function explainMatches(participant, matches) {
 const systemMessage = `
 أنت تكتب شرحًا موجّهًا مباشرة إلى المستخدم نفسه.
 
-
 لغة الإخراج:
 - العربية فقط.
-
 طريقة الكتابة (إلزامية):
 - خاطب المستخدم بصيغة المخاطَب فقط: "أنت"، "لك"، "معك".
 - لا تذكر اسم المستخدم نهائيًا.
@@ -207,45 +181,12 @@ const systemMessage = `
 - اربط بينكما بطريقة تُظهر كيف يمكن أن تستفيد منه أو تتعاون معه.
 - تجنب العبارات العامة مثل "تشتركان في نفس المجال" بدون تفاصيل.
 - اجعل كل جملة تحمل قيمة حقيقية ومعلومة ملموسة.
-مثال (مهم جدًا):
 
-المعطيات:
-- أنت تدرس الطب وتهتم بالبحث الأكاديمي.
-- الشخص الآخر يعمل في شركة طبية ويملك خبرة عملية في المجال.
-
-الإخراج المطلوب:
-
-{
-  "explanation": "أنت تدرس الطب وتركز على الجانب الأكاديمي، بينما يعمل هذا الشخص في شركة طبية، مما يمنحك فرصة لفهم التطبيق العملي لما تتعلمه. خبرته المهنية يمكن أن تساعدك على ربط المعرفة النظرية بالتجربة الواقعية وتوسيع فهمك للمجال."
 }
-
-التزم بنفس الأسلوب، نفس مستوى التفاصيل، ونفس العمق.
-
-- أرجع النتيجة بصيغة JSON فقط بالشكل التالي:
-- يجب ترجمة/تحويل الاسم إلى الإنجليزية والعبرية بشكل صحيح.
-- لا يجوز ترك الاسم كما هو في جميع اللغات.
-- إذا كان الاسم عربي، قم بتحويله إلى:
-  - الإنجليزية (حروف لاتينية)
-  - العبرية (حروف عبرية)
-
-{
-  "explanation": "...",
-  "target_name": {
-    "ar": "...",
-    "en": "...",
-    "he": "..."
-  },
-  "match_name": {
-    "ar": "...",
-    "en": "...",
-    "he": "..."
-  },
-}
-
-- ممنوع كتابة أي نص خارج JSON
+- ممنوع كتابة أي نص خارج 
 `.trim();
 
-    const prompt = `
+const prompt = `
 المشارك المقترح:
 ${match.name || ""}
 
@@ -274,61 +215,119 @@ ${match.name || ""}
 `.trim();
 
 
-const llmRaw = await callLLM(systemMessage, prompt, 200);
-const parsed = llmRaw ? safeJsonParse(llmRaw) : null;
-console.log("RAW:", llmRaw);
-console.log("PARSED:", parsed);
+// LLM call for Arabic explanation
+let llmExplanation = await callLLM(systemMessage, prompt, 500);
 
-let arabicExplanation = parsed?.explanation || null;
+  // Translations
+let llmExplanation_en = null;
+let llmExplanation_he = null;
 
-
-// 🔥 fallback
-if (!arabicExplanation) {
-  arabicExplanation = llmRaw;
+if (llmExplanation) {
+  [llmExplanation_en, llmExplanation_he] = await Promise.all([
+    translateToEnglish(llmExplanation),
+    translateToHebrew(llmExplanation),
+  ]);
 }
 
+  // NEW: Name translations (separate fields)
+const rawMatchName = (match.name || '').trim();
+let match_name_en = null;
+let match_name_he = null;
 
-const targetName = parsed?.target_name || {
-      ar: participant.name,
-      en: participant.name,
-      he: participant.name,
-    };
+if (rawMatchName) {
+  [match_name_en, match_name_he] = await Promise.all([
+    translateNameToEnglish(rawMatchName),
+    translateNameToHebrew(rawMatchName),
+  ]);
+}
 
-const matchName = parsed?.match_name || {
-      ar: match.name,
-      en: match.name,
-      he: match.name,
-    };
+console.log("LLM FINAL (AR):", llmExplanation);
 
-let englishExplanation = null;
-let hebrewExplanation = null;
+if (!llmExplanation) {
+    console.warn("LLM returned EMPTY output for", participant.id, match.id);
+    llmExplanation = null;
+  }
 
-if (arabicExplanation) {
-      [englishExplanation, hebrewExplanation] = await Promise.all([
-        translateToEnglish(arabicExplanation),
-        translateToHebrew(arabicExplanation)
-      ]);
+results.push({
+    matchId: match.id,
+    score: primaryReason?.score ?? null,
+    explanation: {
+      ar: llmExplanation,
+      en: llmExplanation_en,
+      he: llmExplanation_he
+    },
+    match_name: {
+      ar: rawMatchName || null,
+      en: match_name_en,
+      he: match_name_he
     }
+});
 
-    const explanation = {
-      ar: arabicExplanation,
-      en: englishExplanation,
-      he: hebrewExplanation,
-    };
-     results.push({
-      matchId: match.id,
-      score: primaryReason?.score ?? null,
-      explanation,
-      target_name: targetName,
-      match_name: matchName,
-    });
-    }
-
-  return results;
+  
+}
+return results;
 }
 
 
 //--------------------------translations--------------------------
+
+async function translateNameToHebrew(nameText) {
+  const systemMessage = `
+אתה מתמחה בתעתיק/תרגום שמות לעברית.
+
+כללים:
+- החזר/י שם בלבד (ללא משפטים, ללא תוספות).
+- אין להוסיף תארים/כינויים/מקצוע.
+- שמור/י על סדר רכיבי השם כפי שמופיע במקור.
+- אם השם כבר בעברית, החזר/י אותו כפי שהוא.
+`.trim();
+
+  try {
+    const completion = await clientExplanation.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: nameText }
+      ],
+      temperature: 0,
+      max_tokens: 30
+    });
+
+    const text = extractText(completion?.choices?.[0]);
+
+    return text && text.trim() ? text.trim() : null;
+
+  } catch (err) {
+    console.error("❌ Name translation error:", err.message);
+    return nameText; // fallback
+  }
+}
+
+  // Arabic (or any) -> English name (transliteration/translation). Returns ONLY the name.
+async function translateNameToEnglish(nameText) {
+  const systemMessage = `
+You transliterate/translate personal names into English.
+
+Rules:
+- Output ONLY the name (no extra words).
+- Do not add titles or explanations.
+- Keep the same order of name parts.
+- If the name is already in Latin letters, return it as-is.
+`.trim();
+
+  const completion = await clientExplanation.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemMessage },
+      { role: "user", content: nameText }
+    ],
+    temperature: 0,
+    max_tokens: NAME_TRANSLATION_MAX_TOKENS
+  });
+
+  const text = extractText(completion?.choices?.[0]);
+  return text && text.trim() ? text.trim() : null;
+}
 
 async function translateToEnglish(text) {
 const systemMessage = `
@@ -347,7 +346,7 @@ Output:
 `.trim();
 
  try {
-    const completion = await client.chat.completions.create({
+    const completion = await clientTranslator.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemMessage },
@@ -391,7 +390,7 @@ async function translateToHebrew(text) {
 - ללא הסברים, הערות או טקסט נוסף.
 `.trim();
   try {
-    const completion = await client.chat.completions.create({
+    const completion = await clientTranslator.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemMessage },
