@@ -2,10 +2,20 @@ require("dotenv").config();
 
 const { CosmosClient } = require("@azure/cosmos");
 const express = require("express");
-const cors = require("cors");
+
 const axios = require("axios");
 const verifyAdminToken = require("./middleware/verifyAdminToken");
 const app = express();
+const cors = require("cors");
+
+app.use(cors({
+  origin: [
+    "https://harmony-frontend-iota.vercel.app",
+    "http://localhost:5173"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 
 // ===== COSMOS =====
 const client = new CosmosClient({
