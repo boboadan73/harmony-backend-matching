@@ -232,7 +232,7 @@ if (alreadyProcessing) {
 // );
 
 // Mark all participants in this event as processing
-const BatchSize = 10;
+const BatchSize = 20;
 
 for (let start = 0; start < resources.length; start += BatchSize) {
   const batch = resources.slice(start, start + BatchSize);
