@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "jose": "^6.2.2",
-    "openai": "^6.34.0"
-  }
-}
