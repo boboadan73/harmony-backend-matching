@@ -322,7 +322,7 @@ Rules:
       { role: "user", content: nameText }
     ],
     temperature: 0,
-    max_tokens: NAME_TRANSLATION_MAX_TOKENS
+    max_tokens: 30
   });
 
   const text = extractText(completion?.choices?.[0]);
@@ -353,7 +353,7 @@ Output:
         { role: "user", content: text }
       ],
       temperature: 0,
-      max_tokens: 150
+      max_tokens: 700
     });
 
     const result = extractText(completion?.choices?.[0]); // ✅ שינוי שם
@@ -397,7 +397,7 @@ async function translateToHebrew(text) {
         { role: "user", content: text }
       ],
       temperature: 0,
-      max_tokens: 150
+      max_tokens: 700
     });
 
     const result = extractText(completion?.choices?.[0]); // ✅ שינוי שם
