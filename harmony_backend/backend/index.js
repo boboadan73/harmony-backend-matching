@@ -232,7 +232,7 @@ if (alreadyProcessing) {
 // );
 
 // Mark all participants in this event as processing
-const BatchSize = 20;
+const BatchSize = 40;
 
 for (let start = 0; start < resources.length; start += BatchSize) {
   const batch = resources.slice(start, start + BatchSize);
@@ -249,7 +249,7 @@ for (let start = 0; start < resources.length; start += BatchSize) {
 await AllEmbeddings(resources, eventId);
 
 // Compute matches for each participant, save to cache, and mark as ready
-const participantBatchSize = 20;
+const participantBatchSize = 30;
 
 for (let start = 0; start < resources.length; start += participantBatchSize) {
   const batch = resources.slice(start, start + participantBatchSize);
