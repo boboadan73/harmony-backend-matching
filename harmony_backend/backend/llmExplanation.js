@@ -222,17 +222,17 @@ ${match.name || ""}
 
 // LLM call for Arabic explanation
 let llmExplanation = await callLLM(systemMessage, prompt, 500);
-await new Promise(r => setTimeout(r, 200));
+await new Promise(r => setTimeout(r, 300));
 
   // Translations
 let llmExplanation_en = null;
 let llmExplanation_he = null;
 
 if (llmExplanation) {
-  [llmExplanation_en, llmExplanation_he] = await Promise.all([
-  delayed(() => translateToEnglish(llmExplanation), 0),
-  delayed(() => translateToHebrew(llmExplanation), 200),
-]);
+  llmExplanation_en = await translateToEnglish(llmExplanation);
+  await new Promise(r => setTimeout(r, 300));
+
+  llmExplanation_he = await translateToHebrew(llmExplanation);
 }
 
   // NEW: Name translations (separate fields)
@@ -241,10 +241,10 @@ let match_name_en = null;
 let match_name_he = null;
 
 if (rawMatchName) {
-  [match_name_en, match_name_he] = await Promise.all([
-  delayed(() => translateNameToEnglish(rawMatchName), 0),
-  delayed(() => translateNameToHebrew(rawMatchName), 200),
-]);
+  match_name_en = await translateNameToEnglish(rawMatchName);
+  await new Promise(r => setTimeout(r, 300));
+
+  match_name_he = await translateNameToHebrew(rawMatchName);
 }
 
 console.log("LLM FINAL (AR):", llmExplanation);
