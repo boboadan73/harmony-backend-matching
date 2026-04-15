@@ -109,6 +109,11 @@ function getFieldText(person, field) {
   return (map[field] || "").trim();
 }
 
+function delayed(fn, ms) {
+  return new Promise(resolve =>
+    setTimeout(async () => resolve(await fn()), ms)
+  );
+}
 
 
 /* ------------------ MAIN ------------------ */
@@ -217,6 +222,7 @@ ${match.name || ""}
 
 // LLM call for Arabic explanation
 let llmExplanation = await callLLM(systemMessage, prompt, 500);
+await new Promise(r => setTimeout(r, 200));
 
   // Translations
 let llmExplanation_en = null;
@@ -224,9 +230,9 @@ let llmExplanation_he = null;
 
 if (llmExplanation) {
   [llmExplanation_en, llmExplanation_he] = await Promise.all([
-    translateToEnglish(llmExplanation),
-    translateToHebrew(llmExplanation),
-  ]);
+  delayed(() => translateToEnglish(llmExplanation), 0),
+  delayed(() => translateToHebrew(llmExplanation), 200),
+]);
 }
 
   // NEW: Name translations (separate fields)
@@ -236,9 +242,9 @@ let match_name_he = null;
 
 if (rawMatchName) {
   [match_name_en, match_name_he] = await Promise.all([
-    translateNameToEnglish(rawMatchName),
-    translateNameToHebrew(rawMatchName),
-  ]);
+  delayed(() => translateNameToEnglish(rawMatchName), 0),
+  delayed(() => translateNameToHebrew(rawMatchName), 200),
+]);
 }
 
 console.log("LLM FINAL (AR):", llmExplanation);
