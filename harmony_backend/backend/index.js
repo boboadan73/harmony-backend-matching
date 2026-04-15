@@ -636,23 +636,26 @@ function toRouteParticipantId(docId) {
   return s.startsWith("p") ? s.slice(1) : s;
 }
 
-async function getParticipantDocByRouteId(userId) {
+async function getParticipantDocByRouteId(userId, eventId) {
   const docId = toParticipantDocId(userId);
 
   const querySpec = {
-    query: "SELECT TOP 1 * FROM c WHERE c.id = @id",
-    parameters: [{ name: "@id", value: docId }],
+    query: "SELECT TOP 1 * FROM c WHERE c.id = @id AND c.eventId = @eventId",
+    parameters: [
+      { name: "@id", value: docId },
+      { name: "@eventId", value: eventId },
+    ],
   };
 
   const { resources } = await container.items.query(querySpec).fetchAll();
   return resources[0] || null;
 }
 
+
 /* ========================
    MIDDLEWARE
 ======================== */
 
-app.use(cors());
 app.use(express.json());
 
 /* ========================
@@ -779,30 +782,24 @@ app.get("/test-unmet", async (req, res) => {
    SAVE
 ======================== */
 
-app.post("/api/save", async (req, res) => {
+app.post("/api/eventParticipants/:id/save/:targetId", async (req, res) => {
   try {
-    const { userId, targetId, remove } = req.body;
-
-    const resource = await getParticipantDocByRouteId(userId);
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
 
     if (!resource) {
       return res.status(404).json({ message: "User document not found" });
     }
 
     resource.saved = resource.saved || [];
+    const targetId = String(req.params.targetId);
 
-    if (remove) {
-      resource.saved = resource.saved.filter(
-        (id) => String(id) !== String(targetId)
-      );
-    } else {
-      if (!resource.saved.map(String).includes(String(targetId))) {
-        resource.saved.push(String(targetId));
-      }
+    if (!resource.saved.map(String).includes(targetId)) {
+      resource.saved.push(targetId);
     }
 
     const { resource: updated } = await container
-      .item(resource.id, resource.event_id)
+      .item(resource.id, resource.eventId)
       .replace(resource);
 
     res.json({ saved: updated.saved || [] });
@@ -810,40 +807,125 @@ app.post("/api/save", async (req, res) => {
     res.status(500).json({ message: "Save failed", error: error.message });
   }
 });
+app.delete("/api/eventParticipants/:id/save/:targetId", async (req, res) => {
+  try {
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "User document not found" });
+    }
+
+    resource.saved = (resource.saved || []).filter(
+      (id) => String(id) !== String(req.params.targetId)
+    );
+
+    const { resource: updated } = await container
+      .item(resource.id, resource.eventId)
+      .replace(resource);
+
+    res.json({ saved: updated.saved || [] });
+  } catch (error) {
+    res.status(500).json({ message: "Unsave failed", error: error.message });
+  }
+});
 
 /* ========================
    MET
 ======================== */
 
-app.post("/api/met", async (req, res) => {
+app.post("/api/eventParticipants/:id/met/:targetId", async (req, res) => {
   try {
-    const { userId, targetId, remove } = req.body;
-
-    const resource = await getParticipantDocByRouteId(userId);
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
 
     if (!resource) {
       return res.status(404).json({ message: "User document not found" });
     }
 
     resource.met = resource.met || [];
+    const targetId = String(req.params.targetId);
 
-    if (remove) {
-      resource.met = resource.met.filter(
-        (id) => String(id) !== String(targetId)
-      );
-    } else {
-      if (!resource.met.map(String).includes(String(targetId))) {
-        resource.met.push(String(targetId));
-      }
+    if (!resource.met.map(String).includes(targetId)) {
+      resource.met.push(targetId);
     }
 
     const { resource: updated } = await container
-      .item(resource.id, resource.event_id)
+      .item(resource.id, resource.eventId)
       .replace(resource);
 
     res.json({ met: updated.met || [] });
   } catch (error) {
     res.status(500).json({ message: "Met failed", error: error.message });
+  }
+});
+app.delete("/api/eventParticipants/:id/met/:targetId", async (req, res) => {
+  try {
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "User document not found" });
+    }
+
+    resource.met = (resource.met || []).filter(
+      (id) => String(id) !== String(req.params.targetId)
+    );
+
+    const { resource: updated } = await container
+      .item(resource.id, resource.eventId)
+      .replace(resource);
+
+    res.json({ met: updated.met || [] });
+  } catch (error) {
+    res.status(500).json({ message: "Unmet failed", error: error.message });
+  }
+});
+app.post("/api/eventParticipants/:id/skipped/:targetId", async (req, res) => {
+  try {
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "User document not found" });
+    }
+
+    resource.skipped = resource.skipped || [];
+    const targetId = String(req.params.targetId);
+
+    if (!resource.skipped.map(String).includes(targetId)) {
+      resource.skipped.push(targetId);
+    }
+
+    const { resource: updated } = await container
+      .item(resource.id, resource.eventId)
+      .replace(resource);
+
+    res.json({ skipped: updated.skipped || [] });
+  } catch (error) {
+    res.status(500).json({ message: "Skip failed", error: error.message });
+  }
+});
+app.delete("/api/eventParticipants/:id/skipped/:targetId", async (req, res) => {
+  try {
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "User document not found" });
+    }
+
+    resource.skipped = (resource.skipped || []).filter(
+      (id) => String(id) !== String(req.params.targetId)
+    );
+
+    const { resource: updated } = await container
+      .item(resource.id, resource.eventId)
+      .replace(resource);
+
+    res.json({ skipped: updated.skipped || [] });
+  } catch (error) {
+    res.status(500).json({ message: "Unskip failed", error: error.message });
   }
 });
 
@@ -879,24 +961,50 @@ app.post("/api/participants", async (req, res) => {
 });
 
 /* ========================
-   FETCH SAVED / MET
+   FETCH SAVED / MET / skipped
 ======================== */
 
-app.get("/api/saved/:id", async (req, res) => {
+app.get("/api/eventParticipants/:id/saved", async (req, res) => {
   try {
-    const resource = await getParticipantDocByRouteId(req.params.id);
-    res.json(resource?.saved || []);
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "Participant not found" });
+    }
+
+    res.json({ saved: resource.saved || [] });
   } catch (error) {
     res.status(500).json({ message: "Fetch saved failed", error: error.message });
   }
 });
 
-app.get("/api/met/:id", async (req, res) => {
+app.get("/api/eventParticipants/:id/met", async (req, res) => {
   try {
-    const resource = await getParticipantDocByRouteId(req.params.id);
-    res.json(resource?.met || []);
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "Participant not found" });
+    }
+
+    res.json({ met: resource.met || [] });
   } catch (error) {
     res.status(500).json({ message: "Fetch met failed", error: error.message });
+  }
+});
+app.get("/api/eventParticipants/:id/skipped", async (req, res) => {
+  try {
+    const eventId = String(req.query.eventId || "").trim();
+    const resource = await getParticipantDocByRouteId(req.params.id, eventId);
+
+    if (!resource) {
+      return res.status(404).json({ message: "Participant not found" });
+    }
+
+    res.json({ skipped: resource.skipped || [] });
+  } catch (error) {
+    res.status(500).json({ message: "Fetch skipped failed", error: error.message });
   }
 });
 
@@ -907,14 +1015,22 @@ app.get("/api/met/:id", async (req, res) => {
 app.post("/api/auth/phone-login", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
+    const eventId = String(req.body.eventId || "").trim();
 
     if (!phone) {
       return res.status(400).json({ message: "Phone is required" });
     }
 
+    if (!eventId) {
+      return res.status(400).json({ message: "eventId is required" });
+    }
+
     const querySpec = {
-      query: "SELECT TOP 1 c.id, c.phone FROM c WHERE c.phone = @phone",
-      parameters: [{ name: "@phone", value: phone }],
+      query: "SELECT TOP 1 c.id, c.phone, c.eventId FROM c WHERE c.phone = @phone AND c.eventId = @eventId",
+      parameters: [
+        { name: "@phone", value: phone },
+        { name: "@eventId", value: eventId },
+      ],
     };
 
     const { resources } = await container.items.query(querySpec).fetchAll();
@@ -929,6 +1045,7 @@ app.post("/api/auth/phone-login", async (req, res) => {
       participantId: toRouteParticipantId(user.id),
       docId: user.id,
       phone: user.phone,
+      eventId: user.eventId,
     });
   } catch (error) {
     res.status(500).json({
