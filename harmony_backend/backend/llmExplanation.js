@@ -37,13 +37,24 @@ function cosineSimilarity(a, b) {
 /* ------------------ LLM ------------------ */
 const OpenAI = require("openai");
 
-const clientExplanation = new OpenAI({
+const clientTranslatorName = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const clientTranslator = new OpenAI({
+const clientTranslatorHe = new OpenAI({
   apiKey: process.env.OPENAI_API_NEW_KEY,
 });
+
+const clientExplanation = new OpenAI({
+  apiKey: process.env.OPENAI_API_ADAN_KEY,
+});clientExplanation
+
+const clientTranslatorEN = new OpenAI({
+  apiKey: process.env.OPENAI_API_LENA_KEY,
+});
+
+
+
 
 
 function extractText(choice) {
@@ -289,7 +300,7 @@ async function translateNameToHebrew(nameText) {
 `.trim();
 
   try {
-    const completion = await clientExplanation.chat.completions.create({
+    const completion = await clientTranslatorName.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemMessage },
@@ -321,7 +332,7 @@ Rules:
 - If the name is already in Latin letters, return it as-is.
 `.trim();
 
-  const completion = await clientExplanation.chat.completions.create({
+  const completion = await clientTranslatorName.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemMessage },
@@ -352,7 +363,7 @@ Output:
 `.trim();
 
  try {
-    const completion = await clientTranslator.chat.completions.create({
+    const completion = await clientTranslatorEN.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemMessage },
@@ -396,7 +407,7 @@ async function translateToHebrew(text) {
 - ללא הסברים, הערות או טקסט נוסף.
 `.trim();
   try {
-    const completion = await clientTranslator.chat.completions.create({
+    const completion = await clientTranslatorHe.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemMessage },

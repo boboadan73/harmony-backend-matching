@@ -60,6 +60,7 @@ async function handleParticipantMatchesOnly(participant, resources, k = 5) {
 
 
     const matches = participants
+      .filter(p => p.id !== participant.id)
       .map((p) => {
         const score = cosineSimilarity(
           participant.profile_embedding,
