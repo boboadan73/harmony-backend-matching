@@ -316,7 +316,7 @@ async function runRebuildAll(eventId, resources) {
   await AllEmbeddings(resources, eventId);
 
   // Compute matches for each participant, save to cache, and mark as ready
-  const participantBatchSize = 30;
+  const participantBatchSize = 25;
 
   for (let start = 0; start < resources.length; start += participantBatchSize) {
     const batch = resources.slice(start, start + participantBatchSize);
