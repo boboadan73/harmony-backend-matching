@@ -122,7 +122,7 @@ async function AllEmbeddings(resources, eventId) {
 
   console.log(`Loaded ${resources.length} participants from Cosmos for event ${eventId}`);
 
-  const participantBatchSize = 20;
+  const participantBatchSize = 25;
 
   for (let start = 0; start < resources.length; start += participantBatchSize) {
     const batch = resources.slice(start, start + participantBatchSize);

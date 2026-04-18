@@ -120,11 +120,11 @@ function getFieldText(person, field) {
   return (map[field] || "").trim();
 }
 
-function delayed(fn, ms) {
-  return new Promise(resolve =>
-    setTimeout(async () => resolve(await fn()), ms)
-  );
-}
+// function delayed(fn, ms) {
+//   return new Promise(resolve =>
+//     setTimeout(async () => resolve(await fn()), ms)
+//   );
+// }
 
 
 /* ------------------ MAIN ------------------ */
@@ -233,17 +233,17 @@ ${match.name || ""}
 
 // LLM call for Arabic explanation
 let llmExplanation = await callLLM(systemMessage, prompt, 500);
-await new Promise(r => setTimeout(r, 300));
+// await new Promise(r => setTimeout(r, 300));
 
   // Translations
 let llmExplanation_en = null;
 let llmExplanation_he = null;
 
 if (llmExplanation) {
-  llmExplanation_en = await translateToEnglish(llmExplanation);
-  await new Promise(r => setTimeout(r, 300));
-
-  llmExplanation_he = await translateToHebrew(llmExplanation);
+   [llmExplanation_en, llmExplanation_he] = await Promise.all([
+    translateToEnglish(llmExplanation),
+    translateToHebrew(llmExplanation),
+  ]);
 }
 
   // NEW: Name translations (separate fields)
@@ -251,11 +251,18 @@ const rawMatchName = (match.name || '').trim();
 let match_name_en = null;
 let match_name_he = null;
 
-if (rawMatchName) {
-  match_name_en = await translateNameToEnglish(rawMatchName);
-  await new Promise(r => setTimeout(r, 300));
+// if (rawMatchName) {
+//   match_name_en = await translateNameToEnglish(rawMatchName);
+//   await new Promise(r => setTimeout(r, 300));
 
-  match_name_he = await translateNameToHebrew(rawMatchName);
+//   match_name_he = await translateNameToHebrew(rawMatchName);
+// }
+
+if (rawMatchName) {
+  [match_name_en, match_name_he] = await Promise.all([
+    translateNameToEnglish(rawMatchName),
+    translateNameToHebrew(rawMatchName),
+  ]);
 }
 
 console.log("LLM FINAL (AR):", llmExplanation);
