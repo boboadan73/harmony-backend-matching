@@ -487,6 +487,60 @@ app.get("/api/match/update/:eventId/:id", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+app.post("/api/match/update/:eventId/:id", async (req, res) => {
+  try {
+    const eventId = req.params.eventId
+    const targetId = req.params.id
+
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.eventId = @eventId AND c.id = @id",
+      parameters: [
+        { name: "@eventId", value: eventId },
+        { name: "@id", value: targetId },
+      ],
+    }
+
+    const { resources } = await container.items.query(querySpec).fetchAll()
+
+    if (!resources || resources.length === 0) {
+      return res.status(404).json({ error: "Participant not found" })
+    }
+
+    const participant = resources[0]
+
+    delete participant.job_clean
+    delete participant.academic_clean
+    delete participant.professional_clean
+    delete participant.personal_clean
+    delete participant.profile_text
+    delete participant.profile_embedding
+    delete participant.job_embedding
+    delete participant.academic_embedding
+    delete participant.professional_embedding
+    delete participant.personal_embedding
+
+    await deleteMatchCache(eventId, participant.id)
+
+    participant.status = "pending"
+    await container.items.upsert(participant)
+
+    const matches = await handleParticipant(participant, eventId)
+    await setMatchCache(eventId, participant.id, matches)
+
+    participant.status = "ready"
+    await container.items.upsert(participant)
+
+    return res.status(200).json({
+      message: "Matches calculated and saved successfully.",
+      participantId: participant.id,
+      status: participant.status,
+      matches,
+    })
+  } catch (err) {
+    console.error("update participant match error:", err)
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // =====================================
 // Add new participant
