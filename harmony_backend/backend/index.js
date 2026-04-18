@@ -65,21 +65,6 @@ function matchCacheKey(eventId, targetId) {
   return `match:${eventId}:${targetId}`;
 }
 
-// async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 60 * 24 * 30) {
-//   await ensureRedisConnected();
-
-//   const key = matchCacheKey(eventId, targetId);
-
-//   const payload = {
-//     targetId,
-//     matches,
-//   };
-
-//   await redis.set(key, JSON.stringify(payload), {
-//     EX: ttlSeconds,
-//   });
-// }
-
 
 async function setMatchCache(eventId, targetId, matches, ttlSeconds = 60 * 60 * 48) {
   const key = matchCacheKey(eventId, targetId);
@@ -174,111 +159,137 @@ const { AllEmbeddings } = require("./generateEmbeddings");
 // - matching logic changed
 // - full system refresh is needed
 // =====================================
-app.post("/api/match/admin/rebuild-all/:eventId",verifyAdminToken,  async (req, res) => {
+// app.post("/api/match/admin/rebuild-all/:eventId",verifyAdminToken,  async (req, res) => {
   
-try {
-    const eventId = req.params.eventId;
-    const adminId = req.adminAuth.providerUserId;
-    const { resource: event } = await eventsContainer.item(eventId, eventId).read();
+// try {
+//     const eventId = req.params.eventId;
+//     const adminId = req.adminAuth.providerUserId;
+//     const { resource: event } = await eventsContainer.item(eventId, eventId).read();
 
-if (!event) {
-  return res.status(404).json({ error: "Event not found" });
-}
+// if (!event) {
+//   return res.status(404).json({ error: "Event not found" });
+// }
 
-if (event.createdByAdminId !== adminId) {
-  return res.status(403).json({ error: "Forbidden" });
-}
-
-
-const querySpec = {
-      query: "SELECT * FROM c WHERE c.eventId = @eventId",
-      parameters: [{ name: "@eventId", value: eventId }],
-    };
-
-const { resources } = await container.items.query(querySpec).fetchAll();
-
-if (!resources || resources.length === 0) {
-      return res.status(404).json({ error: "No participants found for this event" });
-    }
+// if (event.createdByAdminId !== adminId) {
+//   return res.status(403).json({ error: "Forbidden" });
+// }
 
 
-// const participantBatch = 5;
+// const querySpec = {
+//       query: "SELECT * FROM c WHERE c.eventId = @eventId",
+//       parameters: [{ name: "@eventId", value: eventId }],
+//     };
 
-// for (let start = 0; start < resources.length; start += participantBatch) {
-//   const batch = resources.slice(start, start + participantBatch);
+// const { resources } = await container.items.query(querySpec).fetchAll();
+
+// if (!resources || resources.length === 0) {
+//       return res.status(404).json({ error: "No participants found for this event" });
+//     }
+
+
+
+// // Stop if any participant is already being processed
+// const alreadyProcessing = resources.find((p) => p.status === "processing");
+// if (alreadyProcessing) {
+//       return res.status(409).json({
+//         error: `Participant ${alreadyProcessing.id} is already being processed`,
+//       });
+//     }
+
+// // Mark all participants in this event as processing
+// // await Promise.all(
+// //   resources.map(async (participant) => {
+// //     participant.status = "processing";
+// //     await container.items.upsert(participant);
+// //   })
+// // );
+
+// // Mark all participants in this event as processing
+// const BatchSize = 30;
+
+// for (let start = 0; start < resources.length; start += BatchSize) {
+//   const batch = resources.slice(start, start + BatchSize);
 
 //   await Promise.all(
 //     batch.map(async (participant) => {
-//       participant.status = "pending";
-//       delete participant.job_clean;
-//       delete participant.academic_clean;
-//       delete participant.professional_clean;
-//       delete participant.personal_clean;
-//       delete participant.profile_text;
-//       delete participant.profile_embedding;
-//       delete participant.job_embedding;
-//       delete participant.academic_embedding;
-//       delete participant.professional_embedding;
-//       delete participant.personal_embedding;
+//       participant.status = "processing";
 //       await container.items.upsert(participant);
 //     })
 //   );
 // }
 
-// Stop if any participant is already being processed
-const alreadyProcessing = resources.find((p) => p.status === "processing");
-if (alreadyProcessing) {
+// // Rebuild embeddings for this event
+// await AllEmbeddings(resources, eventId);
+
+// // Compute matches for each participant, save to cache, and mark as ready
+// const participantBatchSize = 30;
+
+// for (let start = 0; start < resources.length; start += participantBatchSize) {
+//   const batch = resources.slice(start, start + participantBatchSize);
+
+//   await Promise.all(
+//     batch.map(async (participant) => {
+//       const matches = await handleParticipantMatchesOnly(participant, resources, 5);
+//       await setMatchCache(eventId, participant.id, matches);
+
+//       participant.status = "ready";
+//       await container.items.upsert(participant);
+//     })
+//   );
+// }
+
+// res.json({
+//       message: "all participants were processed successfully",
+//       eventId,
+//       totalParticipants: resources.length,
+//     });
+//   } catch (err) {
+//     console.error("rebuild-all error:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+app.post("/api/match/admin/rebuild-all/:eventId", verifyAdminToken, async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const adminId = req.adminAuth.providerUserId;
+
+    const { resource: event } = await eventsContainer.item(eventId, eventId).read();
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    if (event.createdByAdminId !== adminId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.eventId = @eventId",
+      parameters: [{ name: "@eventId", value: eventId }],
+    };
+
+    const { resources } = await container.items.query(querySpec).fetchAll();
+
+    if (!resources || resources.length === 0) {
+      return res.status(404).json({ error: "No participants found for this event" });
+    }
+
+    const alreadyProcessing = resources.find((p) => p.status === "processing");
+    if (alreadyProcessing) {
       return res.status(409).json({
         error: `Participant ${alreadyProcessing.id} is already being processed`,
       });
     }
 
-// Mark all participants in this event as processing
-// await Promise.all(
-//   resources.map(async (participant) => {
-//     participant.status = "processing";
-//     await container.items.upsert(participant);
-//   })
-// );
-
-// Mark all participants in this event as processing
-const BatchSize = 30;
-
-for (let start = 0; start < resources.length; start += BatchSize) {
-  const batch = resources.slice(start, start + BatchSize);
-
-  await Promise.all(
-    batch.map(async (participant) => {
-      participant.status = "processing";
-      await container.items.upsert(participant);
-    })
-  );
-}
-
-// Rebuild embeddings for this event
-await AllEmbeddings(resources, eventId);
-
-// Compute matches for each participant, save to cache, and mark as ready
-const participantBatchSize = 30;
-
-for (let start = 0; start < resources.length; start += participantBatchSize) {
-  const batch = resources.slice(start, start + participantBatchSize);
-
-  await Promise.all(
-    batch.map(async (participant) => {
-      const matches = await handleParticipantMatchesOnly(participant, resources, 5);
-      await setMatchCache(eventId, participant.id, matches);
-
-      participant.status = "ready";
-      await container.items.upsert(participant);
-    })
-  );
-}
-
-res.json({
-      message: "all participants were processed successfully",
+    res.status(202).json({
+      message: "Rebuild started successfully",
       eventId,
       totalParticipants: resources.length,
+    });
+
+    runRebuildAll(eventId, resources).catch((err) => {
+      console.error("background rebuild error:", err);
     });
   } catch (err) {
     console.error("rebuild-all error:", err);
@@ -286,7 +297,49 @@ res.json({
   }
 });
 
+async function runRebuildAll(eventId, resources) {
+  // Mark all participants in this event as processing
+  const batchSize = 30;
 
+  for (let start = 0; start < resources.length; start += batchSize) {
+    const batch = resources.slice(start, start + batchSize);
+
+    await Promise.all(
+      batch.map(async (participant) => {
+        participant.status = "processing";
+        await container.items.upsert(participant);
+      })
+    );
+  }
+
+  // Rebuild embeddings for this event
+  await AllEmbeddings(resources, eventId);
+
+  // Compute matches for each participant, save to cache, and mark as ready
+  const participantBatchSize = 40;
+
+  for (let start = 0; start < resources.length; start += participantBatchSize) {
+    const batch = resources.slice(start, start + participantBatchSize);
+
+    await Promise.all(
+      batch.map(async (participant) => {
+        const matches = await handleParticipantMatchesOnly(participant, resources, 5);
+        await setMatchCache(eventId, participant.id, matches);
+
+        participant.status = "ready";
+        await container.items.upsert(participant);
+      })
+    );
+  }
+
+  // Update event matching status to completed
+  const { resource: event } = await eventsContainer.item(eventId, eventId).read();
+
+  if (event) {
+    event.matchingStatus = "completed";
+    await eventsContainer.items.upsert(event);
+  }
+}
 // =====================================
 // Update existing participant
 // -------------------------------------
