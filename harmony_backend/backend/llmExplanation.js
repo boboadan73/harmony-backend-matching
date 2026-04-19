@@ -284,7 +284,8 @@ results.push({
       ar: rawMatchName || null,
       en: match_name_en,
       he: match_name_he
-    }
+    },
+    imageUrl: match.photoUrl || null
 });
 
   
