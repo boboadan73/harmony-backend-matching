@@ -187,6 +187,23 @@ const secondaryReason =
   topReasons[1] && topReasons[1].score >= SECOND_REASON_THRESHOLD
     ? topReasons[1]
     : null;
+const reasonsCount = secondaryReason ? 2 : 1;
+
+console.log("Reasons sent to LLM:", reasonsCount);
+console.log("Reasons summary:", [
+  {
+    type: "primary",
+    pair: `${primaryReason?.fromField}_to_${primaryReason?.toField}`,
+    score: primaryReason?.score ?? null
+  },
+  ...(secondaryReason
+    ? [{
+        type: "secondary",
+        pair: `${secondaryReason?.fromField}_to_${secondaryReason?.toField}`,
+        score: secondaryReason?.score ?? null
+      }]
+    : [])
+]);
 
 const systemMessage = `
 أنت تكتب شرحًا موجّهًا مباشرة إلى المستخدم نفسه.
@@ -201,6 +218,7 @@ const systemMessage = `
 
 قواعد صارمة جدًا:
 - أعد الشرح في نقطتين فقط.
+- كل نقطة لا تزيد عن 15 كلمة.
 - كل نقطة يجب أن تكون قصيرة وواضحة وفي سطر مستقل.
 - كل نقطة يجب أن تذكر سببًا حقيقيًا ومحددًا للملاءمة.
 - النقطة الأولى: اذكر رابطًا واضحًا أو تكاملًا مهنيًا أو أكاديميًا أو عمليًا بينكما.
