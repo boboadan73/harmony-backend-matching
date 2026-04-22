@@ -47,7 +47,7 @@ const clientTranslatorHe = new OpenAI({
 
 const clientExplanation = new OpenAI({
   apiKey: process.env.OPENAI_API_ADAN_KEY,
-});clientExplanation
+});
 
 const clientTranslatorEN = new OpenAI({
   apiKey: process.env.OPENAI_API_LENA_KEY,
@@ -139,38 +139,54 @@ for (const match of matches) {
   if (!match) continue;
 
   const fieldScores = {
-      jobTitle_to_jobTitle: cosineSimilarity(participant.job_embedding || [], match.job_embedding || []),
-      academic_to_academic: cosineSimilarity(participant.academic_embedding || [], match.academic_embedding || []),
-      professional_to_professional: cosineSimilarity(participant.professional_embedding || [], match.professional_embedding || []),
-      personal_to_personal: cosineSimilarity(participant.personal_embedding || [], match.personal_embedding || []),
+  // same-to-same
+  jobTitle_to_jobTitle: cosineSimilarity(participant.job_embedding || [], match.job_embedding || []),
+  academic_to_academic: cosineSimilarity(participant.academic_embedding || [], match.academic_embedding || []),
+  professional_to_professional: cosineSimilarity(participant.professional_embedding || [], match.professional_embedding || []),
+  personal_to_personal: cosineSimilarity(participant.personal_embedding || [], match.personal_embedding || []),
 
-      academic_to_professional: cosineSimilarity(participant.academic_embedding || [], match.professional_embedding || []),
-      academic_to_personal: cosineSimilarity(participant.academic_embedding || [], match.personal_embedding || []),
+  // participant jobTitle -> match fields
+  jobTitle_to_academic: cosineSimilarity(participant.job_embedding || [], match.academic_embedding || []),
+  jobTitle_to_professional: cosineSimilarity(participant.job_embedding || [], match.professional_embedding || []),
+  jobTitle_to_personal: cosineSimilarity(participant.job_embedding || [], match.personal_embedding || []),
 
-      professional_to_academic: cosineSimilarity(participant.professional_embedding || [], match.academic_embedding || []),
-      professional_to_personal: cosineSimilarity(participant.professional_embedding || [], match.personal_embedding || []),
+  // participant fields -> match jobTitle
+  academic_to_jobTitle: cosineSimilarity(participant.academic_embedding || [], match.job_embedding || []),
+  professional_to_jobTitle: cosineSimilarity(participant.professional_embedding || [], match.job_embedding || []),
+  personal_to_jobTitle: cosineSimilarity(participant.personal_embedding || [], match.job_embedding || []),
 
-      personal_to_academic: cosineSimilarity(participant.personal_embedding || [], match.academic_embedding || []),
-      personal_to_professional: cosineSimilarity(participant.personal_embedding || [], match.professional_embedding || []),
-    };
+  // existing cross-field
+  academic_to_professional: cosineSimilarity(participant.academic_embedding || [], match.professional_embedding || []),
+  academic_to_personal: cosineSimilarity(participant.academic_embedding || [], match.personal_embedding || []),
 
-    const ranked = Object.entries(fieldScores)
-      .map(([fieldPair, score]) => {
-        const [fromField, toField] = fieldPair.split("_to_");
+  professional_to_academic: cosineSimilarity(participant.professional_embedding || [], match.academic_embedding || []),
+  professional_to_personal: cosineSimilarity(participant.professional_embedding || [], match.personal_embedding || []),
 
-        return {
-          fromField,
-          toField,
-          score,
-          participantText: getFieldText(participant, fromField),
-          matchText: getFieldText(match, toField),
+  personal_to_academic: cosineSimilarity(participant.personal_embedding || [], match.academic_embedding || []),
+  personal_to_professional: cosineSimilarity(participant.personal_embedding || [], match.professional_embedding || []),
+};
+
+  const ranked = Object.entries(fieldScores)
+  .map(([fieldPair, score]) => {
+    const [fromField, toField] = fieldPair.split("_to_");
+
+    return {
+        fromField,
+        toField,
+        score,
+        participantText: getFieldText(participant, fromField),
+        matchText: getFieldText(match, toField),
         };
       })
-      .sort((a, b) => b.score - a.score);
+  .sort((a, b) => b.score - a.score);
 
-    const topReasons = ranked.slice(0, 2);
-    const primaryReason = topReasons[0];
-    const secondaryReason = topReasons[1];
+const SECOND_REASON_THRESHOLD = 0.60;
+const topReasons = ranked.slice(0, 2);
+const primaryReason = topReasons[0];
+const secondaryReason =
+  topReasons[1] && topReasons[1].score >= SECOND_REASON_THRESHOLD
+    ? topReasons[1]
+    : null;
 
 const systemMessage = `
 أنت تكتب شرحًا موجّهًا مباشرة إلى المستخدم نفسه.
@@ -184,22 +200,24 @@ const systemMessage = `
 - اكتب وكأنك تشرح للمستخدم لماذا هذا الشخص مناسب له شخصيًا.
 
 قواعد صارمة جدًا:
-- اكتب 2–3 جمل فقط.
-- كل جملة يجب أن تشرح نقطة واحدة مشتركة أو مكمّلة بينك وبين الشخص الآخر.
-- ممنوع وصف كل شخص لوحده.
-- ممنوع ذكر معلومات غير مشتركة.
+- أعد الشرح في نقطتين فقط.
+- كل نقطة يجب أن تكون قصيرة وواضحة وفي سطر مستقل.
+- كل نقطة يجب أن تذكر سببًا حقيقيًا ومحددًا للملاءمة.
+- النقطة الأولى: اذكر رابطًا واضحًا أو تكاملًا مهنيًا أو أكاديميًا أو عمليًا بينكما.
+- النقطة الثانية: اشرح كيف يمكن أن يفيدك هذا الشخص أو ما نوع التعاون الممكن بينكما.
+- ممنوع وصف كل شخص بشكل منفصل.
+- ممنوع ذكر معلومات غير مرتبطة أو غير مشتركة.
 - ممنوع استخدام صيغ مثل:
   "فلان وفلان"، "كلاكما"، "الطرفين"، "الشخصين".
 - ممنوع استخدام لغة عامة أو إنشائية.
+- ممنوع استخدام عبارات غير طبيعية أو حرفية مثل: أنت تعملين كطالبة، تتقاسم الاهتمام، لديكما نفس المجال.
+- ممنوع ذكر أسماء الحقول أو وصفها بصيغة تقنية، مثل: السيرة الأكاديمية، السيرة المهنية، السيرة الشخصية، المسمى الوظيفي.
+- ممنوع الإشارة إلى النصوص بصياغات مثل: بحسب سيرتك، في ملفه، في المجال عندك، في المجال عنده.
 - استخدم تفاصيل حقيقية من النص (مثل: مكان العمل، اسم شركة، مجال دقيق، نوع خبرة).
 - إذا كان هناك نفس المجال (مثل الطب، القانون، الهندسة)، وضّح الفرق أو التكامل:
-  (مثال: أنت تدرس الطب وهو يعمل في شركة طبية، أو أنت تركز على الجانب الأكاديمي وهو يعمل في التطبيق العملي).
 - اربط بينكما بطريقة تُظهر كيف يمكن أن تستفيد منه أو تتعاون معه.
-- تجنب العبارات العامة مثل "تشتركان في نفس المجال" بدون تفاصيل.
 - اجعل كل جملة تحمل قيمة حقيقية ومعلومة ملموسة.
-
-}
-- ممنوع كتابة أي نص خارج 
+- ممنوع كتابة أي نص خارج الشرح المطلوب.
 `.trim();
 
 const prompt = `
@@ -212,14 +230,15 @@ ${match.name || ""}
 - معلوماتك: ${primaryReason?.participantText || ""}
 - معلومات المشارك المقترح: ${primaryReason?.matchText || ""}
 
-
-السبب الثانوي:
+${
+  secondaryReason
+    ? `السبب الثانوي:
 - المجال عندك: ${normalizeReasonLabel(secondaryReason?.fromField || "")}
 - المجال عند المشارك المقترح: ${normalizeReasonLabel(secondaryReason?.toField || "")}
 - معلوماتك: ${secondaryReason?.participantText || ""}
-- معلومات المشارك المقترح: ${secondaryReason?.matchText || ""}
-
-
+- معلومات المشارك المقترح: ${secondaryReason?.matchText || ""}`
+    : ""
+}
 
 اسم المشارك الأساسي الذي يجب إرجاعه أيضًا داخل target_name.original:
 ${participant.name || ""}
@@ -274,7 +293,7 @@ if (!llmExplanation) {
 
 results.push({
     matchId: match.id,
-    score: primaryReason?.score ?? null,
+    score: match.score ?? null,
     explanation: {
       ar: llmExplanation,
       en: llmExplanation_en,
