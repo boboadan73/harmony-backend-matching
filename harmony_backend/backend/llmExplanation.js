@@ -145,15 +145,15 @@ for (const match of matches) {
   professional_to_professional: cosineSimilarity(participant.professional_embedding || [], match.professional_embedding || []),
   personal_to_personal: cosineSimilarity(participant.personal_embedding || [], match.personal_embedding || []),
 
-  // participant jobTitle -> match fields
-  jobTitle_to_academic: cosineSimilarity(participant.job_embedding || [], match.academic_embedding || []),
-  jobTitle_to_professional: cosineSimilarity(participant.job_embedding || [], match.professional_embedding || []),
-  jobTitle_to_personal: cosineSimilarity(participant.job_embedding || [], match.personal_embedding || []),
+  // // participant jobTitle -> match fields
+  // jobTitle_to_academic: cosineSimilarity(participant.job_embedding || [], match.academic_embedding || []),
+  // jobTitle_to_professional: cosineSimilarity(participant.job_embedding || [], match.professional_embedding || []),
+  // jobTitle_to_personal: cosineSimilarity(participant.job_embedding || [], match.personal_embedding || []),
 
-  // participant fields -> match jobTitle
-  academic_to_jobTitle: cosineSimilarity(participant.academic_embedding || [], match.job_embedding || []),
-  professional_to_jobTitle: cosineSimilarity(participant.professional_embedding || [], match.job_embedding || []),
-  personal_to_jobTitle: cosineSimilarity(participant.personal_embedding || [], match.job_embedding || []),
+  // // participant fields -> match jobTitle
+  // academic_to_jobTitle: cosineSimilarity(participant.academic_embedding || [], match.job_embedding || []),
+  // professional_to_jobTitle: cosineSimilarity(participant.professional_embedding || [], match.job_embedding || []),
+  // personal_to_jobTitle: cosineSimilarity(participant.personal_embedding || [], match.job_embedding || []),
 
   // existing cross-field
   academic_to_professional: cosineSimilarity(participant.academic_embedding || [], match.professional_embedding || []),
@@ -218,8 +218,8 @@ const systemMessage = `
 - اكتب وكأنك تشرح للمستخدم لماذا هذا الشخص مناسب له شخصيًا.
 
 قواعد صارمة جدًا:
-- أعد الشرح في نقطتين فقط كحد اقصى 30 كلمة لكل نقطة.
-- النقطة الأولى: اشرح لماذا هذا الشخص مناسب لك بناءً على خبرته، خلفيته، مجاله، أو نوع المعرفة التي يملكها.
+- أعد الشرح في نقطتين فقط, كحد اقصى 30 كلمة لكل نقطة.
+- النقطة الأولى: اشرح لماذا هذا الشخص مناسب لك بناءً على خبرته، خلفيته، مجاله.
 - إذا كان هناك أكثر من سبب، اذكرها باختصار داخل نفس النقطة من دون تعداد.
 - النقطة الثانية: اشرح كيف يمكن أن يفيدك هذا الشخص أو ما نوع التعاون الممكن بينكما.
 - اجباري ذكر وفق معلومات الشخص المقترح مكان عمله, اسم شركة، تخصص، نوع مشروع، نوع خبرة، أو مجال دقيق.
