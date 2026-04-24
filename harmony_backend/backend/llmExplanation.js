@@ -140,8 +140,8 @@ for (const match of matches) {
 
   const fieldScores = {
   // same-to-same
-  jobTitle_to_jobTitle: cosineSimilarity(participant.job_embedding || [], match.job_embedding || []),
-  academic_to_academic: cosineSimilarity(participant.academic_embedding || [], match.academic_embedding || []),
+  // jobTitle_to_jobTitle: cosineSimilarity(participant.job_embedding || [], match.job_embedding || []),
+  // academic_to_academic: cosineSimilarity(participant.academic_embedding || [], match.academic_embedding || []),
   professional_to_professional: cosineSimilarity(participant.professional_embedding || [], match.professional_embedding || []),
   personal_to_personal: cosineSimilarity(participant.personal_embedding || [], match.personal_embedding || []),
 
@@ -218,8 +218,9 @@ const systemMessage = `
 - اكتب وكأنك تشرح للمستخدم لماذا هذا الشخص مناسب له شخصيًا.
 
 قواعد صارمة جدًا:
--اكتب 2–3 جمل فقط .
-- كل جملة يجب أن تشرح نقطة واحدة مشتركة أو مكمّلة بينك وبين الشخص الآخر.
+-اكتب الشرح في نقطتين.
+- النقطة الأولى: اذكر أوضح تفصيل مهني أو أكاديمي عن الشخص المقترح.
+- النقطة الثانية: اذكر تفصيلًا إضافيًا عن خبرته، مشروعه، تخصصه، أو بيئة عمله.
 - ركّز في تفسير الملاءمة على معلومات المشارك المقترح.
 -مثال : تعمل في قسم العناية المكثفة في مستشفى إيخيلوف، ولديها خبرة مباشرة في التعامل مع الحالات الحرجة داخل بيئة سريرية مكثفة ,تحمل ماجستير في إدارة الأنظمة الصحية، إلى جانب خبرة في تنسيق العمل بين الطواقم الطبية وإدارة الحالات المعقدة.
 - لا تكتب عبارات عامة مثل "خلفية قوية" أو "خبرة مميزة" .
