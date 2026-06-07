@@ -313,6 +313,7 @@ if (!llmExplanation) {
 results.push({
     matchId: match.id,
     score: match.score ?? null,
+    jobTitle: match.jobTitle || '',
     explanation: {
       ar: llmExplanation,
       en: llmExplanation_en,
