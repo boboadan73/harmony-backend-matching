@@ -319,7 +319,8 @@ results.push({
       en: match_name_en,
       he: match_name_he
     },
-    imageUrl: match.photoUrl || null
+    imageUrl: match.photoUrl || null,
+    linkedinUrl: match.LinkedIn || match.linkedin || match.linkedinUrl || ''
 });
 
   
