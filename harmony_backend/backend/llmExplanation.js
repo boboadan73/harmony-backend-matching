@@ -281,22 +281,26 @@ if (llmExplanation) {
 }
 
   // NEW: Name translations (separate fields)
+const rawParticipantName = (participant.name || '').trim();
 const rawMatchName = (match.name || '').trim();
+
+let participant_name_en = null;
+let participant_name_he = null;
+
 let match_name_en = null;
 let match_name_he = null;
 
-// if (rawMatchName) {
-//   match_name_en = await translateNameToEnglish(rawMatchName);
-//   await new Promise(r => setTimeout(r, 300));
-
-//   match_name_he = await translateNameToHebrew(rawMatchName);
-// }
-
-if (rawMatchName) {
-  [match_name_en, match_name_he] = await Promise.all([
-    translateNameToEnglish(rawMatchName),
-    translateNameToHebrew(rawMatchName),
+if (rawMatchName || rawParticipantName) {
+  const [englishNamesResult, hebrewNamesResult] = await Promise.all([
+    translateNameToEnglish(rawParticipantName, rawMatchName),
+    translateNameToHebrew(rawParticipantName, rawMatchName)
   ]);
+
+  participant_name_en = englishNamesResult?.participant || rawParticipantName || null;
+  match_name_en = englishNamesResult?.match || rawMatchName || null;
+
+  participant_name_he = hebrewNamesResult?.participant || rawParticipantName || null;
+  match_name_he = hebrewNamesResult?.match || rawMatchName || null;
 }
 
 console.log("LLM FINAL (AR):", llmExplanation);
@@ -313,6 +317,11 @@ results.push({
       ar: llmExplanation,
       en: llmExplanation_en,
       he: llmExplanation_he
+    },
+    participant_name: {
+      ar: rawParticipantName || null,
+      en: participant_name_en,
+      he: participant_name_he
     },
     match_name: {
       ar: rawMatchName || null,
@@ -331,62 +340,127 @@ return results;
 
 //--------------------------translations--------------------------
 
-async function translateNameToHebrew(nameText) {
+async function translateNameToHebrew(participantName, matchName) {
   const systemMessage = `
 אתה מתמחה בתעתיק/תרגום שמות לעברית.
 
 כללים:
-- החזר/י שם בלבד (ללא משפטים, ללא תוספות).
+- החזר JSON בלבד.
+- אין להוסיף משפטים, הסברים או טקסט נוסף.
 - אין להוסיף תארים/כינויים/מקצוע.
-- שמור/י על סדר רכיבי השם כפי שמופיע במקור.
-- אם השם כבר בעברית, החזר/י אותו כפי שהוא.
+- שמור על סדר רכיבי השם כפי שמופיע במקור.
+- אם שם כבר בעברית, החזר אותו כפי שהוא.
+
+מבנה הפלט חייב להיות בדיוק:
+{
+  "participant": "שם המשתתף בעברית",
+  "match": "שם המשתתף המוצע בעברית"
+}
 `.trim();
+
+  const payload = {
+    participant: participantName || "",
+    match: matchName || ""
+  };
 
   try {
     const completion = await clientTranslatorName.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemMessage },
-        { role: "user", content: nameText }
+        { role: "user", content: JSON.stringify(payload) }
       ],
       temperature: 0,
-      max_tokens: 30
+      max_tokens: 80,
+      response_format: { type: "json_object" }
     });
 
     const text = extractText(completion?.choices?.[0]);
 
-    return text && text.trim() ? text.trim() : null;
+    if (!text) {
+      return {
+        participant: participantName || null,
+        match: matchName || null
+      };
+    }
+
+    const parsed = JSON.parse(text);
+
+    return {
+      participant: parsed.participant?.trim() || participantName || null,
+      match: parsed.match?.trim() || matchName || null
+    };
 
   } catch (err) {
     console.error("❌ Name translation error:", err.message);
-    return nameText; // fallback
+
+    return {
+      participant: participantName || null,
+      match: matchName || null
+    };
   }
 }
 
   // Arabic (or any) -> English name (transliteration/translation). Returns ONLY the name.
-async function translateNameToEnglish(nameText) {
+async function translateNameToEnglish(participantName, matchName) {
   const systemMessage = `
 You transliterate/translate personal names into English.
 
 Rules:
-- Output ONLY the name (no extra words).
-- Do not add titles or explanations.
+- Return JSON only.
+- Do not add explanations or extra text.
+- Do not add titles, nicknames, jobs, or extra words.
 - Keep the same order of name parts.
-- If the name is already in Latin letters, return it as-is.
+- If a name is already in Latin letters, return it as-is.
+
+The output must be exactly:
+{
+  "participant": "participant name in English",
+  "match": "match name in English"
+}
 `.trim();
 
-  const completion = await clientTranslatorName.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemMessage },
-      { role: "user", content: nameText }
-    ],
-    temperature: 0,
-    max_tokens: 30
-  });
+  const payload = {
+    participant: participantName || "",
+    match: matchName || ""
+  };
 
-  const text = extractText(completion?.choices?.[0]);
-  return text && text.trim() ? text.trim() : null;
+  try {
+    const completion = await clientTranslatorName.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: JSON.stringify(payload) }
+      ],
+      temperature: 0,
+      max_tokens: 80,
+      response_format: { type: "json_object" }
+    });
+
+    const text = extractText(completion?.choices?.[0]);
+
+    if (!text) {
+      return {
+        participant: participantName || null,
+        match: matchName || null
+      };
+    }
+
+    const parsed = JSON.parse(text);
+
+    return {
+      participant: parsed.participant?.trim() || participantName || null,
+      match: parsed.match?.trim() || matchName || null
+    };
+
+  } catch (err) {
+    console.error("❌ English name translation error:", err.message);
+
+    return {
+      participant: participantName || null,
+      match: matchName || null
+    };
+  }
 }
 
 async function translateToEnglish(text) {
