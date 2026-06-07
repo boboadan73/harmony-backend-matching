@@ -309,6 +309,8 @@ if (!llmExplanation) {
     console.warn("LLM returned EMPTY output for", participant.id, match.id);
     llmExplanation = null;
   }
+console.log("MATCH JOB TITLE:", match.jobTitle)
+console.log("MATCH RAW DATA:", match.rawData)
 
 results.push({
     matchId: match.id,
