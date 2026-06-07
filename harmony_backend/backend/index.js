@@ -106,6 +106,61 @@ async function getMatchCache(eventId, targetId) {
     return null;
   }
 }
+async function enrichMatchesWithOnlineStatus(eventId, cachedMatches) {
+  const matches = Array.isArray(cachedMatches?.matches)
+    ? cachedMatches.matches
+    : [];
+
+  if (!matches.length) return cachedMatches;
+
+  const ids = matches
+    .map((m) => String(m.matchId || m.id || "").trim())
+    .filter(Boolean);
+
+  const querySpec = {
+    query: `
+      SELECT c.id, c.isOnline, c.lastSeenAt
+      FROM c
+      WHERE c.eventId = @eventId
+      AND ARRAY_CONTAINS(@ids, c.id)
+    `,
+    parameters: [
+      { name: "@eventId", value: eventId },
+      { name: "@ids", value: ids },
+    ],
+  };
+
+  const { resources } = await container.items
+    .query(querySpec, { enableCrossPartitionQuery: true })
+    .fetchAll();
+
+  const onlineMap = new Map(
+    resources.map((p) => [
+      String(p.id),
+      {
+        isOnline: Boolean(p.isOnline),
+        lastSeenAt: p.lastSeenAt || null,
+      },
+    ])
+  );
+
+  return {
+    ...cachedMatches,
+    matches: matches.map((m) => {
+      const id = String(m.matchId || m.id || "");
+      const onlineData = onlineMap.get(id) || {
+        isOnline: false,
+        lastSeenAt: null,
+      };
+
+      return {
+        ...m,
+        isOnline: onlineData.isOnline,
+        lastSeenAt: onlineData.lastSeenAt,
+      };
+    }),
+  };
+}
 
 async function deleteMatchCache(eventId, targetId) {
   await ensureRedisConnected();
@@ -679,8 +734,13 @@ app.get("/api/match/:eventId/:id", async (req, res) => {
     const cachedMatches = await getMatchCache(eventId, targetId);
 
     if (cachedMatches) {
-    return res.status(200).json(cachedMatches);
-    }
+  const enrichedMatches = await enrichMatchesWithOnlineStatus(
+    eventId,
+    cachedMatches
+  );
+
+  return res.status(200).json(enrichedMatches);
+}
 
   return res.status(404).json({
     error: "Participant is marked ready but no cached matches were found.",
