@@ -332,7 +332,7 @@ results.push({
       he: match_name_he
     },
     imageUrl: match.photoUrl || null,
-    linkedinUrl:
+ linkedinUrl:
   match.linkedInUrl ||
   match.linkedinUrl ||
   match.linkedIn ||
