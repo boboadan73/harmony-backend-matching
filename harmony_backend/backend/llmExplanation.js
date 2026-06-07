@@ -332,7 +332,14 @@ results.push({
       he: match_name_he
     },
     imageUrl: match.photoUrl || null,
-    linkedinUrl: match.LinkedIn || match.linkedInUrl || match.linkedinUrl || match.rawData?.LinkedIn || ''
+    linkedinUrl:
+  match.linkedInUrl ||
+  match.linkedinUrl ||
+  match.linkedIn ||
+  match.linkedin ||
+  match.rawData?.LinkedIn ||
+  match.rawData?.['LinkedIn'] ||
+  '',
 });
 
   
