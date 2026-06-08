@@ -378,7 +378,7 @@ async function runRebuildAll(eventId, resources) {
 
     await Promise.all(
       batch.map(async (participant) => {
-        const matches = await handleParticipantMatchesOnly(participant, resources, 5);
+        const matches = await handleParticipantMatchesOnly(participant, resources, 10);
         await setMatchCache(eventId, participant.id, matches);
 
         participant.status = "ready";

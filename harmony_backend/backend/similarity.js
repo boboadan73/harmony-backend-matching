@@ -45,7 +45,7 @@ function cosineSimilarity(a, b) {
 const { generateProfileEmbedding,  } = require("./generateEmbeddings");
 const { explainMatches,  } = require("./llmExplanation");
 
-async function handleParticipantMatchesOnly(participant, resources, k = 15) {
+async function handleParticipantMatchesOnly(participant, resources, k = 10) {
   let target;
 
   try {
@@ -93,7 +93,7 @@ async function handleParticipantMatchesOnly(participant, resources, k = 15) {
   }
 }
 
-async function handleParticipant(participant, eventId, k = 15) {
+async function handleParticipant(participant, eventId, k = 10) {
   // 1) Validate input participant
   if (!participant || !participant.id) {
     throw new Error("Participant object is missing or invalid");
