@@ -309,10 +309,13 @@ if (!llmExplanation) {
     console.warn("LLM returned EMPTY output for", participant.id, match.id);
     llmExplanation = null;
   }
+console.log("MATCH JOB TITLE:", match.jobTitle)
+console.log("MATCH RAW DATA:", match.rawData)
 
 results.push({
     matchId: match.id,
     score: match.score ?? null,
+    jobTitle: match.jobTitle || '',
     explanation: {
       ar: llmExplanation,
       en: llmExplanation_en,
@@ -329,7 +332,17 @@ results.push({
       he: match_name_he
     },
     imageUrl: match.photoUrl || null,
-    linkedinUrl: match.LinkedIn || match.linkedin || match.linkedinUrl || ''
+  linkedinUrl:
+  match.linkedinUrl ||
+  match.linkedInUrl ||
+  match.rawData?.LinkedIn ||
+  '',
+
+linkedInUrl:
+  match.linkedinUrl ||
+  match.linkedInUrl ||
+  match.rawData?.LinkedIn ||
+  '',
 });
 
   

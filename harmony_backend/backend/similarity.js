@@ -168,6 +168,8 @@ async function handleParticipant(participant, eventId, k = 15) {
         return {
           ...p,
           score,
+          linkedInUrl: p.linkedInUrl || p.linkedinUrl || p.rawData?.LinkedIn || '',
+          linkedinUrl: p.linkedInUrl || p.linkedinUrl || p.rawData?.LinkedIn || '',
         };
       })
       .sort((a, b) => b.score - a.score)
