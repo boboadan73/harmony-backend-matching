@@ -386,8 +386,6 @@ for (let start = 0; start < resources.length; start += participantBatchSize) {
       await container.items.upsert(participant);
     })
   );
-
-  await sleep(15000);
 }
 
   // Update event matching status to completed
