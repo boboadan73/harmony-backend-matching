@@ -17,6 +17,8 @@ app.use(cors({
   credentials: true
 }));
 
+app.use(express.json());
+
 // ===== COSMOS =====
 const client = new CosmosClient({
   endpoint: process.env.COSMOS_ENDPOINT,
@@ -717,6 +719,87 @@ app.post("/api/match/add/:eventId/:id", async (req, res) => {
 // similarity dynamically at request time instead of only reading
 // precomputed results.
 // =====================================
+
+app.post("/api/match/more/:eventId/:id", async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const targetId = req.params.id;
+
+    const limit = Number(req.body?.limit || 5);
+
+    if (!Number.isInteger(limit) || limit <= 0) {
+      return res.status(400).json({
+        error: "Invalid matches limit",
+      });
+    }
+
+    const cachedMatches = await getMatchCache(eventId, targetId);
+
+    if (!cachedMatches || !Array.isArray(cachedMatches.matches)) {
+      return res.status(404).json({
+        error: "No existing match cache was found for this participant",
+      });
+    }
+
+    const existingMatches = cachedMatches.matches;
+
+    const excludedIds = existingMatches
+      .map((m) => String(m.matchId || m.id || "").trim())
+      .filter(Boolean);
+
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.eventId = @eventId",
+      parameters: [
+        { name: "@eventId", value: eventId },
+      ],
+    };
+
+    const { resources } = await container.items
+      .query(querySpec)
+      .fetchAll();
+
+    const participant = resources.find(
+      (p) => String(p.id) === String(targetId)
+    );
+
+    if (!participant) {
+      return res.status(404).json({
+        error: "Participant not found",
+      });
+    }
+
+    const newMatches = await handleParticipantMatchesOnly(
+      participant,
+      resources,
+      limit,
+      excludedIds
+    );
+
+    const updatedMatches = [
+      ...existingMatches,
+      ...newMatches,
+    ].sort((a, b) => {
+      return (b.score ?? 0) - (a.score ?? 0);
+    });
+
+    await setMatchCache(eventId, targetId, updatedMatches);
+
+    const enrichedCache = await enrichMatchesWithOnlineStatus(eventId, {
+      targetId,
+      matches: updatedMatches,
+    });
+
+    return res.status(200).json(enrichedCache);
+  } catch (err) {
+    console.error("load more matches error:", err);
+
+    return res.status(500).json({
+      error: err.message || "Failed to load more matches",
+    });
+  }
+});
+
+
 app.get("/api/match/:eventId/:id", async (req, res) => {
   try {
     const eventId = req.params.eventId;
@@ -794,7 +877,6 @@ app.get("/api/match/:eventId/:id", async (req, res) => {
 
 
 
-
 /* ========================
    HELPERS
 ======================== */
@@ -829,11 +911,9 @@ async function getParticipantDocByRouteId(userId, eventId) {
 }
 
 
-/* ========================
-   MIDDLEWARE
-======================== */
 
-app.use(express.json());
+
+
 
 /* ========================
    BASIC ROUTES

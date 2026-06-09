@@ -45,13 +45,25 @@ function cosineSimilarity(a, b) {
 const { generateProfileEmbedding,  } = require("./generateEmbeddings");
 const { explainMatches,  } = require("./llmExplanation");
 
-async function handleParticipantMatchesOnly(participant, resources, k = 10) {
+async function handleParticipantMatchesOnly(participant, resources, k, excludedIds = []) {
   let target;
 
   try {
     if (!resources || resources.length === 0) {
       throw new Error("No participants found");
     }
+
+    const limit = Number(k);
+
+    if (!Number.isInteger(limit) || limit <= 0) {
+      throw new Error("Invalid matches limit");
+    }
+
+    const excluded = new Set(
+      excludedIds.map(id => String(id))
+    );
+
+    excluded.add(String(participant.id));
 
     // Keep only participants with valid embeddings
     const participants = resources.filter(
@@ -60,7 +72,7 @@ async function handleParticipantMatchesOnly(participant, resources, k = 10) {
 
 
     const matches = participants
-      .filter(p => p.id !== participant.id)
+      .filter(p => !excluded.has(String(p.id)))
       .map((p) => {
         const score = cosineSimilarity(
           participant.profile_embedding,
@@ -74,7 +86,7 @@ async function handleParticipantMatchesOnly(participant, resources, k = 10) {
         
       })
       .sort((a, b) => b.score - a.score)
-      .slice(0, k);
+      .slice(0, limit);
 
     console.log(`Computed ${matches.length} matches for participant ${participant.id}`);
     console.log("========== DEBUG ==========");
