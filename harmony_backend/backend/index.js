@@ -200,7 +200,7 @@ async function deleteMatchCache(eventId, targetId) {
 const { handleParticipant } = require("./similarity");
 const { handleParticipantMatchesOnly } = require("./similarity");
 const { AllEmbeddings } = require("./generateEmbeddings");
-
+const { translateMissingParticipantFields } = require("./translateParticipants");
 
 
 
@@ -367,6 +367,9 @@ async function runRebuildAll(eventId, resources) {
     );
   }
 
+  // Translate participant names and job titles once, then save to Cosmos
+  await translateMissingParticipantFields(resources, eventId);
+
   // Rebuild embeddings for this event
   await AllEmbeddings(resources, eventId);
 
@@ -462,6 +465,8 @@ app.post("/api/match/admin/update/:eventId/:id", verifyAdminToken, async (req, r
 
     // Save updated participant back to Cosmos
     await container.items.upsert(participant);
+
+    await translateMissingParticipantFields([participant], eventId);
 
     // Reuse the same shared flow
     const matches = await handleParticipant(participant, eventId);
@@ -580,6 +585,8 @@ app.post("/api/match/update/:eventId/:id", async (req, res) => {
     participant.status = "pending"
     await container.items.upsert(participant)
 
+    await translateMissingParticipantFields([participant], eventId);
+
     const matches = await handleParticipant(participant, eventId)
     await setMatchCache(eventId, participant.id, matches)
 
@@ -638,6 +645,7 @@ app.post("/api/match/admin/add/:eventId/:id", verifyAdminToken, async (req, res)
 
     const participant = resources[0];
 
+    await translateMissingParticipantFields([participant], eventId);
     const matches = await handleParticipant(participant, eventId);
     await setMatchCache(eventId, participant.id, matches);
 
@@ -676,6 +684,7 @@ app.post("/api/match/add/:eventId/:id", async (req, res) => {
 
     const participant = resources[0];
 
+    await translateMissingParticipantFields([participant], eventId);
     const matches = await handleParticipant(participant, eventId);
     await setMatchCache(eventId, participant.id, matches);
 
