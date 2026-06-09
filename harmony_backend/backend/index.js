@@ -371,23 +371,24 @@ async function runRebuildAll(eventId, resources) {
   await AllEmbeddings(resources, eventId);
 
   // Compute matches for each participant, save to cache, and mark as ready
-  const participantBatchSize = 25;
+ const participantBatchSize = 10;
 
-  for (let start = 0; start < resources.length; start += participantBatchSize) {
-    const batch = resources.slice(start, start + participantBatchSize);
+for (let start = 0; start < resources.length; start += participantBatchSize) {
+  const batch = resources.slice(start, start + participantBatchSize);
 
-    await Promise.all(
-      batch.map(async (participant) => {
+  await Promise.all(
+    batch.map(async (participant) => {
+      const matches = await handleParticipantMatchesOnly(participant, resources, 10);
 
-        const matches = await handleParticipantMatchesOnly(participant, resources, 10)
+      await setMatchCache(eventId, participant.id, matches);
 
-        await setMatchCache(eventId, participant.id, matches);
+      participant.status = "ready";
+      await container.items.upsert(participant);
+    })
+  );
 
-        participant.status = "ready";
-        await container.items.upsert(participant);
-      })
-    );
-  }
+  await sleep(15000);
+}
 
   // Update event matching status to completed
   const { resource: event } = await eventsContainer.item(eventId, eventId).read();
