@@ -16,7 +16,7 @@ const container = database.container("eventParticipants");
 // });
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_NEW_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
