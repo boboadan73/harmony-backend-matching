@@ -198,4 +198,4 @@ async function handleParticipant(participant, eventId, k = 10) {
 }
 
 
-module.exports = { handleParticipant, handleParticipantMatchesOnly,};
+module.exports = { handleParticipant, handleParticipantMatchesOnly,cosineSimilarity,};
