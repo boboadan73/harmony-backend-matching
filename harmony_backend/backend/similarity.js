@@ -65,11 +65,12 @@ async function handleParticipantMatchesOnly(participant, resources, k, excludedI
 
     excluded.add(String(participant.id));
 
-    // Keep only participants with valid embeddings
-    const participants = resources.filter(
-      (p) => Array.isArray(p.profile_embedding) && p.profile_embedding.length > 0
-    );
-
+  const participants = resources.filter(
+  (p) =>
+    p.hidden !== true &&
+    Array.isArray(p.profile_embedding) &&
+    p.profile_embedding.length > 0
+);
 
     const matches = participants
       .filter(p => !excluded.has(String(p.id)))
@@ -163,14 +164,15 @@ async function handleParticipant(participant, eventId, k = 10) {
 
     // 7) Compute similarity only against participants in the same event
     //    who already have embeddings
-    const matches = allParticipants
-      .filter((p) => {
-        return (
-          p.id !== target.id &&
-          Array.isArray(p.profile_embedding) &&
-          p.profile_embedding.length > 0
-        );
-      })
+ const matches = allParticipants
+  .filter((p) => {
+    return (
+      p.id !== target.id &&
+      p.hidden !== true &&
+      Array.isArray(p.profile_embedding) &&
+      p.profile_embedding.length > 0
+    );
+  })
       .map((p) => {
         const score = cosineSimilarity(
           target.profile_embedding,
