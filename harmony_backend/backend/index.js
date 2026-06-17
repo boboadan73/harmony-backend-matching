@@ -831,6 +831,35 @@ app.get("/api/match/:eventId/:id", async (req, res) => {
     eventId,
     cachedMatches
   );
+      const matchIds = enrichedMatches.matches.map(
+  m => String(m.matchId || m.id)
+);
+
+const hiddenQuery = {
+  query: `
+    SELECT c.id, c.hidden
+    FROM c
+    WHERE c.eventId = @eventId
+    AND ARRAY_CONTAINS(@ids, c.id)
+  `,
+  parameters: [
+    { name: "@eventId", value: eventId },
+    { name: "@ids", value: matchIds },
+  ],
+};
+
+const { resources: participants } = await container.items
+  .query(hiddenQuery)
+  .fetchAll();
+
+const hiddenMap = new Map(
+  participants.map(p => [String(p.id), p.hidden === true])
+);
+
+enrichedMatches.matches = enrichedMatches.matches.filter(m => {
+  const id = String(m.matchId || m.id);
+  return hiddenMap.get(id) !== true;
+});
 
   return res.status(200).json(enrichedMatches);
 }
