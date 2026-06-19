@@ -67,8 +67,11 @@ async function handleParticipantMatchesOnly(participant, resources, k, excludedI
 
     // Keep only participants with valid embeddings
     const participants = resources.filter(
-      (p) => Array.isArray(p.profile_embedding) && p.profile_embedding.length > 0
-    );
+  (p) =>
+    !p.hidden &&
+    Array.isArray(p.profile_embedding) &&
+    p.profile_embedding.length > 0
+);
 
 
     const matches = participants
@@ -167,6 +170,7 @@ async function handleParticipant(participant, eventId, k = 10) {
       .filter((p) => {
         return (
           p.id !== target.id &&
+           !p.hidden &&
           Array.isArray(p.profile_embedding) &&
           p.profile_embedding.length > 0
         );
