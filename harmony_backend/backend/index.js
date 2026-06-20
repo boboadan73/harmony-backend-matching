@@ -181,6 +181,8 @@ AND ARRAY_CONTAINS(@ids, c.id)
         translated: fresh.translated ?? m.translated,
         match_name: fresh.translated?.name ?? m.match_name,
         jobTitle: fresh.jobTitle ?? m.jobTitle,
+        job: fresh.jobTitle ?? m.job,
+        company: fresh.jobTitle ?? m.company,
         jobTitle_i18n: fresh.translated?.jobTitle ?? m.jobTitle_i18n,
         isOnline: fresh.isOnline ?? false,
         lastSeenAt: fresh.lastSeenAt ?? null,
