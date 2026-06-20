@@ -121,10 +121,18 @@ async function enrichMatchesWithOnlineStatus(eventId, cachedMatches) {
 
   const querySpec = {
     query: `
-      SELECT c.id, c.isOnline, c.lastSeenAt
-      FROM c
-      WHERE c.eventId = @eventId
-      AND ARRAY_CONTAINS(@ids, c.id)
+      SELECT
+  c.id,
+  c.name,
+  c.photoUrl,
+  c.linkedinUrl,
+  c.translated,
+  c.jobTitle,
+  c.isOnline,
+  c.lastSeenAt
+FROM c
+WHERE c.eventId = @eventId
+AND ARRAY_CONTAINS(@ids, c.id)
     `,
     parameters: [
       { name: "@eventId", value: eventId },
@@ -140,8 +148,15 @@ async function enrichMatchesWithOnlineStatus(eventId, cachedMatches) {
     resources.map((p) => [
       String(p.id),
       {
-        isOnline: Boolean(p.isOnline),
-        lastSeenAt: p.lastSeenAt || null,
+        
+  name: p.name,
+  photoUrl: p.photoUrl,
+  linkedinUrl: p.linkedinUrl,
+  translated: p.translated,
+  jobTitle: p.jobTitle,
+  isOnline: Boolean(p.isOnline),
+  lastSeenAt: p.lastSeenAt || null,
+}
       },
     ])
   );
@@ -154,11 +169,21 @@ async function enrichMatchesWithOnlineStatus(eventId, cachedMatches) {
         isOnline: false,
         lastSeenAt: null,
       };
+      const fresh = onlineData;
 
       return {
         ...m,
-        isOnline: onlineData.isOnline,
-        lastSeenAt: onlineData.lastSeenAt,
+        name: fresh.name ?? m.name,
+        photoUrl: fresh.photoUrl ?? m.photoUrl,
+        image: fresh.photoUrl ?? m.image,
+        linkedinUrl: fresh.linkedinUrl ?? m.linkedinUrl,
+        linkedInUrl: fresh.linkedinUrl ?? m.linkedInUrl,
+        translated: fresh.translated ?? m.translated,
+        match_name: fresh.translated?.name ?? m.match_name,
+        jobTitle: fresh.jobTitle ?? m.jobTitle,
+        jobTitle_i18n: fresh.translated?.jobTitle ?? m.jobTitle_i18n,
+        isOnline: fresh.isOnline ?? false,
+        lastSeenAt: fresh.lastSeenAt ?? null,
       };
     }),
   };
