@@ -305,11 +305,13 @@ async function runRebuildAll(eventId, resources) {
 
   // Compute matches for each participant, save to cache, and mark as ready
  const participantBatchSize = 15;
+ const totalBatches = Math.ceil(resources.length / participantBatchSize);
 
  console.log(`Matches calculation started. Total batches: ${totalBatches}`);
 
 for (let start = 0; start < resources.length; start += participantBatchSize) {
   const batch = resources.slice(start, start + participantBatchSize);
+  const batchNumber = Math.floor(start / participantBatchSize) + 1;
 
   await Promise.all(
     batch.map(async (participant) => {

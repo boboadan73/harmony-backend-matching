@@ -26,7 +26,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const TRANSLATION_BATCH_SIZE = 5;
+const TRANSLATION_BATCH_SIZE = 10;
 const TRANSLATION_BATCH_DELAY_MS = 300;
 
 function getJobTitle(participant) {
