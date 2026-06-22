@@ -91,11 +91,7 @@ async function handleParticipantMatchesOnly(participant, resources, k, excludedI
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
 
-    console.log(`Computed ${matches.length} matches for participant ${participant.id}`);
-    console.log("========== DEBUG ==========");
-    console.log("Participant:", participant.id);
-    console.log("Matches length:", matches.length);
-    console.log("===========================");
+
 
     const result = await explainMatches(participant, matches);
 
@@ -162,8 +158,8 @@ async function handleParticipant(participant, eventId, k = 10) {
     const { resources: allParticipants } = await container.items
       .query(sameEventQuerySpec)
       .fetchAll();
-    console.log(allParticipants);
 
+      
     // 7) Compute similarity only against participants in the same event
     //    who already have embeddings
     const matches = allParticipants

@@ -1,20 +1,6 @@
 require("dotenv").config();
 const { CosmosClient } = require("@azure/cosmos");
-/* ------------------ COSMOS ------------------ */
 
-// const client = new CosmosClient({
-//   endpoint: process.env.COSMOS_ENDPOINT,
-//   key: process.env.COSMOS_KEY,
-// });
-
-// const database = client.database("harmony-db");
-// const container = database.container("participants");
-
-// async function loadParticipants() {
-//   const query = { query: "SELECT * FROM c" };
-//   const { resources } = await container.items.query(query).fetchAll();
-//   return resources;
-// }
 
 
 
@@ -37,9 +23,7 @@ function cosineSimilarity(a, b) {
 /* ------------------ LLM ------------------ */
 const OpenAI = require("openai");
 
-// const clientTranslatorName = new OpenAI({
-//   apiKey: process.env.OPENAI_API_KEY,
-// });
+
 
 const clientTranslatorHe = new OpenAI({
   apiKey: process.env.OPENAI_API_NEW_KEY,
@@ -120,11 +104,7 @@ function getFieldText(person, field) {
   return (map[field] || "").trim();
 }
 
-// function delayed(fn, ms) {
-//   return new Promise(resolve =>
-//     setTimeout(async () => resolve(await fn()), ms)
-//   );
-// }
+
 
 
 /* ------------------ MAIN ------------------ */
@@ -280,28 +260,7 @@ if (llmExplanation) {
   ]);
 }
 
-  // NEW: Name translations (separate fields)
-// const rawParticipantName = (participant.name || '').trim();
-// const rawMatchName = (match.name || '').trim();
 
-// let participant_name_en = null;
-// let participant_name_he = null;
-
-// let match_name_en = null;
-// let match_name_he = null;
-
-// if (rawMatchName || rawParticipantName) {
-//   const [englishNamesResult, hebrewNamesResult] = await Promise.all([
-//     translateNameToEnglish(rawParticipantName, rawMatchName),
-//     translateNameToHebrew(rawParticipantName, rawMatchName)
-//   ]);
-
-//   participant_name_en = englishNamesResult?.participant || rawParticipantName || null;
-//   match_name_en = englishNamesResult?.match || rawMatchName || null;
-
-//   participant_name_he = hebrewNamesResult?.participant || rawParticipantName || null;
-//   match_name_he = hebrewNamesResult?.match || rawMatchName || null;
-// }
 
 const rawParticipantName = (participant.name || '').trim();
 const rawMatchName = (match.name || '').trim();
@@ -394,128 +353,7 @@ return results;
 
 //--------------------------translations--------------------------
 
-// async function translateNameToHebrew(participantName, matchName) {
-//   const systemMessage = `
-// אתה מתמחה בתעתיק/תרגום שמות לעברית.
 
-// כללים:
-// - החזר JSON בלבד.
-// - אין להוסיף משפטים, הסברים או טקסט נוסף.
-// - אין להוסיף תארים/כינויים/מקצוע.
-// - שמור על סדר רכיבי השם כפי שמופיע במקור.
-// - אם שם כבר בעברית, החזר אותו כפי שהוא.
-
-// מבנה הפלט חייב להיות בדיוק:
-// {
-//   "participant": "שם המשתתף בעברית",
-//   "match": "שם המשתתף המוצע בעברית"
-// }
-// `.trim();
-
-//   const payload = {
-//     participant: participantName || "",
-//     match: matchName || ""
-//   };
-
-//   try {
-//     const completion = await clientTranslatorName.chat.completions.create({
-//       model: "gpt-4o-mini",
-//       messages: [
-//         { role: "system", content: systemMessage },
-//         { role: "user", content: JSON.stringify(payload) }
-//       ],
-//       temperature: 0,
-//       max_tokens: 80,
-//       response_format: { type: "json_object" }
-//     });
-
-//     const text = extractText(completion?.choices?.[0]);
-
-//     if (!text) {
-//       return {
-//         participant: participantName || null,
-//         match: matchName || null
-//       };
-//     }
-
-//     const parsed = JSON.parse(text);
-
-//     return {
-//       participant: parsed.participant?.trim() || participantName || null,
-//       match: parsed.match?.trim() || matchName || null
-//     };
-
-//   } catch (err) {
-//     console.error("❌ Name translation error:", err.message);
-
-//     return {
-//       participant: participantName || null,
-//       match: matchName || null
-//     };
-//   }
-// }
-
-  // Arabic (or any) -> English name (transliteration/translation). Returns ONLY the name.
-// async function translateNameToEnglish(participantName, matchName) {
-//   const systemMessage = `
-// You transliterate/translate personal names into English.
-
-// Rules:
-// - Return JSON only.
-// - Do not add explanations or extra text.
-// - Do not add titles, nicknames, jobs, or extra words.
-// - Keep the same order of name parts.
-// - If a name is already in Latin letters, return it as-is.
-
-// The output must be exactly:
-// {
-//   "participant": "participant name in English",
-//   "match": "match name in English"
-// }
-// `.trim();
-
-//   const payload = {
-//     participant: participantName || "",
-//     match: matchName || ""
-//   };
-
-//   try {
-//     const completion = await clientTranslatorName.chat.completions.create({
-//       model: "gpt-4o-mini",
-//       messages: [
-//         { role: "system", content: systemMessage },
-//         { role: "user", content: JSON.stringify(payload) }
-//       ],
-//       temperature: 0,
-//       max_tokens: 80,
-//       response_format: { type: "json_object" }
-//     });
-
-//     const text = extractText(completion?.choices?.[0]);
-
-//     if (!text) {
-//       return {
-//         participant: participantName || null,
-//         match: matchName || null
-//       };
-//     }
-
-//     const parsed = JSON.parse(text);
-
-//     return {
-//       participant: parsed.participant?.trim() || participantName || null,
-//       match: parsed.match?.trim() || matchName || null
-//     };
-
-//   } catch (err) {
-//     console.error("❌ English name translation error:", err.message);
-
-//     return {
-//       participant: participantName || null,
-//       match: matchName || null
-//     };
-//   }
-// }
 
 async function translateToEnglish(text) {
 const systemMessage = `

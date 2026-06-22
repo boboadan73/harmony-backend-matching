@@ -26,6 +26,9 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const TRANSLATION_BATCH_SIZE = 5;
+const TRANSLATION_BATCH_DELAY_MS = 300;
+
 function getJobTitle(participant) {
   return cleanText(
     participant.jobTitle ||
@@ -174,8 +177,8 @@ async function translateMissingParticipantFields(resources, eventId) {
     `Translation check: ${participantsToTranslate.length}/${resources.length} participants need translation`
   );
 
-  const batchSize = Number(process.env.TRANSLATION_BATCH_SIZE || 3);
-  const delayMs = Number(process.env.TRANSLATION_BATCH_DELAY_MS || 1000);
+  const batchSize = TRANSLATION_BATCH_SIZE;
+  const delayMs = TRANSLATION_BATCH_DELAY_MS;
 
   for (let start = 0; start < participantsToTranslate.length; start += batchSize) {
     const batch = participantsToTranslate.slice(start, start + batchSize);
