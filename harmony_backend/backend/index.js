@@ -317,6 +317,7 @@ for (let start = 0; start < resources.length; start += participantBatchSize) {
 
   if (event) {
     event.matchingStatus = "completed";
+    event.status = "ready";
     await eventsContainer.items.upsert(event);
   }
 }
