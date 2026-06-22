@@ -174,7 +174,7 @@ async function translateMissingParticipantFields(resources, eventId) {
   const participantsToTranslate = resources.filter(needsTranslation);
 
   console.log(
-    `Translation check: ${participantsToTranslate.length}/${resources.length} participants need translation`
+    `Translation started: ${participantsToTranslate.length}/${resources.length} participants need translation`
   );
 
   const batchSize = TRANSLATION_BATCH_SIZE;
@@ -202,8 +202,11 @@ async function translateMissingParticipantFields(resources, eventId) {
 
         Object.assign(participant, updatedDoc);
 
-        console.log(`Translated participant ${participant.id}`);
+
       })
+    );
+    console.log(
+      `Translation batch completed: ${Math.min(start + batch.length, participantsToTranslate.length)}/${participantsToTranslate.length}`
     );
 
     if (start + batchSize < participantsToTranslate.length) {

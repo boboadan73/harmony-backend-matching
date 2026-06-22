@@ -169,21 +169,7 @@ const secondaryReason =
     : null;
 const reasonsCount = secondaryReason ? 2 : 1;
 
-console.log("Reasons sent to LLM:", reasonsCount);
-console.log("Reasons summary:", [
-  {
-    type: "primary",
-    pair: `${primaryReason?.fromField}_to_${primaryReason?.toField}`,
-    score: primaryReason?.score ?? null
-  },
-  ...(secondaryReason
-    ? [{
-        type: "secondary",
-        pair: `${secondaryReason?.fromField}_to_${secondaryReason?.toField}`,
-        score: secondaryReason?.score ?? null
-      }]
-    : [])
-]);
+
 
 const systemMessage = `
 أنت تكتب شرحًا موجّهًا مباشرة إلى المستخدم نفسه.
@@ -295,14 +281,13 @@ const match_job_title_en =
 const match_job_title_he =
   match.translated?.jobTitle?.he || rawMatchJobTitle || null;
 
-console.log("LLM FINAL (AR):", llmExplanation);
+
 
 if (!llmExplanation) {
     console.warn("LLM returned EMPTY output for", participant.id, match.id);
     llmExplanation = null;
   }
-console.log("MATCH JOB TITLE:", match.jobTitle)
-console.log("MATCH RAW DATA:", match.rawData)
+
 
 results.push({
     matchId: match.id,

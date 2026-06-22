@@ -275,7 +275,11 @@ app.post("/api/match/admin/rebuild-all/:eventId", verifyAdminToken, async (req, 
 
 async function runRebuildAll(eventId, resources) {
   // Mark all participants in this event as processing
+  console.log(`Rebuild started for event ${eventId}. Participants: ${resources.length}`);
+
   const batchSize = 30;
+
+  console.log("Setting participants to processing...");
 
   for (let start = 0; start < resources.length; start += batchSize) {
     const batch = resources.slice(start, start + batchSize);
@@ -286,16 +290,23 @@ async function runRebuildAll(eventId, resources) {
         await container.items.upsert(participant);
       })
     );
+    console.log(`Processing status updated: ${Math.min(start + batch.length, resources.length)}/${resources.length}`);
   }
 
   // Translate participant names and job titles once, then save to Cosmos
+  console.log("Translation started...");
   await translateMissingParticipantFields(resources, eventId);
+  console.log("Translation completed.");
 
   // Rebuild embeddings for this event
+  console.log("Embeddings started...");
   await AllEmbeddings(resources, eventId);
+  console.log("Embeddings completed.");
 
   // Compute matches for each participant, save to cache, and mark as ready
  const participantBatchSize = 15;
+
+ console.log(`Matches calculation started. Total batches: ${totalBatches}`);
 
 for (let start = 0; start < resources.length; start += participantBatchSize) {
   const batch = resources.slice(start, start + participantBatchSize);
@@ -310,6 +321,7 @@ for (let start = 0; start < resources.length; start += participantBatchSize) {
       await container.items.upsert(participant);
     })
   );
+  console.log(`Matches batch completed: ${batchNumber}/${totalBatches}`);
 }
 
   // Update event matching status to completed
@@ -320,6 +332,7 @@ for (let start = 0; start < resources.length; start += participantBatchSize) {
     event.status = "ready";
     await eventsContainer.items.upsert(event);
   }
+  console.log(`Rebuild completed for event ${eventId}.`);
 }
 
 // =====================================
