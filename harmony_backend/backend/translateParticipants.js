@@ -80,14 +80,30 @@ You will receive:
 - name: a personal name
 - jobTitle: a professional title
 
-Rules:
-- Return JSON only.
-- Do not add explanations.
-- Do not add titles, nicknames, jobs, or extra words to personal names.
-- For personal names: transliterate naturally into each target language.
-- For jobTitle: translate naturally into each target language.
-- If a value is already in the target language, return it as-is.
-- Keep outputs short and clean.
+Very important rules for personal names:
+- Personal names must be transliterated phonetically, not translated by meaning.
+- Never shorten a name.
+- Never simplify a name into a common word.
+- Never remove vowels or important sounds.
+- Preserve the order of name parts exactly.
+- Do not add titles, jobs, nicknames, prefixes, or explanations.
+- If the name is already written in the target language, return it as-is.
+- If the original name is written in Latin letters, keep name.en exactly as the original input.
+- If the original name is written in Arabic, keep name.ar exactly as the original input.
+- If the original name is written in Hebrew, keep name.he exactly as the original input.
+- For Hebrew transliteration, write the name according to pronunciation, not meaning.
+- Example: "SARRE" should be transliterated to Hebrew as "שארי", not "שר".
+- Example: "Maram Wattad" should be transliterated to Hebrew as "מראם ותד", not translated.
+- Example: "عازر غنطوس" should be transliterated to English as "Azar Gantus", not changed by meaning.
+
+Rules for jobTitle:
+- Translate jobTitle naturally into Arabic, English, and Hebrew.
+- Job titles may be translated by meaning.
+- Keep job titles short and professional.
+
+Return JSON only.
+Do not add explanations.
+Do not add any text outside the JSON.
 
 Required JSON structure:
 {

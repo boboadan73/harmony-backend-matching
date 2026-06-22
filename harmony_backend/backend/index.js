@@ -304,7 +304,7 @@ async function runRebuildAll(eventId, resources) {
   console.log("Embeddings completed.");
 
   // Compute matches for each participant, save to cache, and mark as ready
- const participantBatchSize = 15;
+ const participantBatchSize = 12;
  const totalBatches = Math.ceil(resources.length / participantBatchSize);
 
  console.log(`Matches calculation started. Total batches: ${totalBatches}`);
