@@ -12,7 +12,7 @@ def build_dataset():
     COSMOS_KEY = os.getenv("COSMOS_KEY")
 
     DB_NAME = "harmony-db"
-    CONTAINER_NAME = "participants"
+    CONTAINER_NAME = "eventParticipants"
 
     # ✅ Create client
     client = CosmosClient(COSMOS_URI, credential=COSMOS_KEY)
@@ -43,8 +43,7 @@ def build_dataset():
         participants[p["id"]] = text
 
     print("Participants loaded:", len(participants))
-
-    # =========================
+ # =========================
     # LOAD LABELS
     # =========================
     labels = []
@@ -56,31 +55,72 @@ def build_dataset():
         p2 = item["person2Id"]
         label = item["label"]
 
-        labels.append((p1, p2, label))
+        labels.append((p1, p2, label, "old"))
 
     print("Labels loaded:", len(labels))
 
+        # =========================
+    # LOAD NEW FEEDBACK FROM INTERACTIONS
+    # =========================
+   
+    new_positive_count = 0
+    new_negative_count = 0
+
+    query = "SELECT * FROM c WHERE IS_DEFINED(c.interactions)"
+
+    for p in container.query_items(query=query, enable_cross_partition_query=True):
+        chooser_id = p["id"]
+        interactions = p.get("interactions", {})
+
+        saved = interactions.get("saved", [])
+        met = interactions.get("met", [])
+        skipped = interactions.get("skipped", [])
+        skipped_reasons = interactions.get("skippedReasons", {})
+
+        # Save = positive
+        for chosen_id in saved:
+            labels.append((chooser_id, chosen_id, 1, "new"))
+            new_positive_count += 1
+
+        # Met = positive
+        for chosen_id in met:
+            labels.append((chooser_id, chosen_id, 1, "new"))
+            new_positive_count += 1
+
+        # Skip not_relevant = negative
+        for skipped_id in skipped:
+            reason_data = skipped_reasons.get(skipped_id, {})
+            reason = reason_data.get("reason", "")
+
+            if reason == "not_relevant":
+                labels.append((chooser_id, skipped_id, 0, "new"))
+                new_negative_count += 1
+
+    print("New positive feedback pairs:", new_positive_count)
+    print("New negative feedback pairs:", new_negative_count)
+    print("Total labels:", len(labels))
+
+   
     # # =========================
     # # BUILD TRAIN DATA
     # # =========================
     Pairs = []
 
-    for p1, p2, label in labels:
-        if p1 in participants and p2 in participants:
-            Pairs.append(
-                InputExample(
-                    texts=[participants[p1], participants[p2]],
-                    label=float(label)
-                )
-            )
+    for p1, p2, label, source in labels:
+     if p1 in participants and p2 in participants:
+
+        example = InputExample(
+            texts=[participants[p1], participants[p2]],
+            label=float(label)
+        )
+
+        example.source = source
+
+        Pairs.append(example)
+
 
     print("Pairs:", len(Pairs))
-    # label_1_count = sum(1 for _, _, label in labels if float(label) == 1.0)
-    # label_0_count = sum(1 for _, _, label in labels if float(label) == 0.0)
-
-    # print("Label 1 pairs:", label_1_count)
-    # print("Label 0 pairs:", label_0_count)
-
+ 
     example_labels = [example.label for example in Pairs]
 
     train_data, val_data = train_test_split(
