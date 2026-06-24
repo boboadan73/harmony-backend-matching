@@ -172,4 +172,4 @@ def build_dataset(event_id=None):
 
 
 if __name__ == "__main__":
-    train_data, val_data = build_dataset(event_id="518e23c7-9679-4e4a-b578-ee6c8440194d")
+    train_data, val_data = build_dataset()
