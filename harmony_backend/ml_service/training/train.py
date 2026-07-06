@@ -87,7 +87,8 @@ print("Pushing updated model to Hugging Face...")
 
 model.push_to_hub(
     repo_id=HF_WORKING_REPO_ID,
-    token=HF_TOKEN
+    token=HF_TOKEN,
+    exist_ok=True
 )
 
 print("Model pushed successfully to:", HF_WORKING_REPO_ID)

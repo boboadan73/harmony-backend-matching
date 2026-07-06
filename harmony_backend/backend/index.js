@@ -7,6 +7,8 @@ const axios = require("axios");
 const verifyAdminToken = require("./middleware/verifyAdminToken");
 const app = express();
 const cors = require("cors");
+const { spawn } = require("child_process");
+const path = require("path");
 
 app.use(cors({
   origin: [
@@ -28,6 +30,119 @@ const client = new CosmosClient({
 const database = client.database("harmony-db");
 const container = database.container("eventParticipants");
 const eventsContainer = database.container("events");
+
+/**
+ * Runs the Python fine-tuning script for a specific event.
+The eventId is passed to train.py so the model trains only on feedback from that event.
+The function runs the training process in the background and resolves when training finishes successfully.
+If the Python process fails, the function rejects with an error.
+ */
+
+function runFineTuning(eventId) {
+  return new Promise((resolve, reject) => {
+    // const trainingDir = path.join(__dirname, "../ml_service/training");
+
+    // const pythonProcess = spawn("python", ["train.py", eventId], {
+    //   cwd: trainingDir,
+    //   shell: true,
+    // });
+
+  const trainingDir = path.join(__dirname, "../ml_service/training");
+  const pythonExe = path.join(trainingDir, "venv311", "Scripts", "python.exe");
+
+  const pythonProcess = spawn(pythonExe, ["train.py", eventId], {
+    cwd: trainingDir,
+  });
+
+    pythonProcess.stdout.on("data", (data) => {
+      console.log(`[fine-tuning]: ${data.toString()}`);
+    });
+
+    pythonProcess.stderr.on("data", (data) => {
+      console.error(`[fine-tuning error]: ${data.toString()}`);
+    });
+
+    pythonProcess.on("close", (code) => {
+      if (code === 0) {
+        console.log(`Fine-tuning completed for event ${eventId}`);
+        resolve();
+      } else {
+        reject(new Error(`Fine-tuning failed with code ${code}`));
+      }
+    });
+  });
+}
+
+// Checks whether an event is ready for automatic fine-tuning based on status, trainingStatus, and event date.
+function shouldStartTraining(event) {
+  if (!event) return false;
+
+  if (event.status !== "ready") return false;
+
+  if (event.trainingStatus !== "not_ready") return false;
+
+  if (!event.date) return false;
+
+  const eventDate = new Date(event.date);
+  const now = new Date();
+
+  const oneDayAfterEvent = new Date(eventDate);
+  oneDayAfterEvent.setDate(oneDayAfterEvent.getDate() + 1);
+
+  return now >= oneDayAfterEvent;
+}
+
+// Starts fine-tuning for a single event and updates its training status in Cosmos.
+async function startTrainingForEvent(event) {
+  const eventId = event.id;
+
+  event.trainingStatus = "in_progress";
+  event.trainingStartedAt = new Date().toISOString();
+  event.trainingError = null;
+
+  await eventsContainer.items.upsert(event);
+
+  try {
+    await runFineTuning(eventId);
+
+    event.trainingStatus = "completed";
+    event.trainingCompletedAt = new Date().toISOString();
+
+    await eventsContainer.items.upsert(event);
+
+  } catch (err) {
+    event.trainingStatus = "failed";
+    event.trainingFailedAt = new Date().toISOString();
+    event.trainingError = err.message;
+
+    await eventsContainer.items.upsert(event);
+
+    console.error(`Training failed for event ${eventId}:`, err);
+  }
+}
+
+// Checks all events and starts fine-tuning for events that are ready.
+async function checkEventsForTraining() {
+  try {
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.status = 'ready'",
+    };
+
+    const { resources: events } = await eventsContainer.items
+      .query(querySpec)
+      .fetchAll();
+
+    for (const event of events) {
+      if (shouldStartTraining(event)) {
+        console.log(`Event ${event.id} is ready for training`);
+        startTrainingForEvent(event);
+      }
+    }
+  } catch (err) {
+    console.error("checkEventsForTraining failed:", err);
+  }
+}
+
 // ------ CACHE (REDIS) ------
 const { createClient } = require("redis");
 
@@ -212,6 +327,22 @@ const { handleParticipantMatchesOnly } = require("./similarity");
 const { AllEmbeddings } = require("./generateEmbeddings");
 const { translateMissingParticipantFields } = require("./translateParticipants");
 
+app.post("/api/training/admin/test/:eventId", async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+
+    res.status(202).json({
+      message: "Fine-tuning test started",
+      eventId,
+    });
+
+    runFineTuning(eventId).catch((err) => {
+      console.error("Fine-tuning test failed:", err);
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 // =====================================
@@ -1223,6 +1354,13 @@ app.post("/api/auth/phone-login", async (req, res) => {
 // =====================================
 // START SERVER
 // =====================================
+
+// Run automatic training check once when the server starts.
+checkEventsForTraining();
+
+// Then check again every hour.
+setInterval(checkEventsForTraining, 60 * 60 * 1000);
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
