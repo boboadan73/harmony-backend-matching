@@ -404,9 +404,26 @@ app.post("/api/match/admin/rebuild-all/:eventId", verifyAdminToken, async (req, 
   }
 });
 
+async function updateEventProgressPercent(eventId, progressPercent) {
+  const { resource: event } = await eventsContainer.item(eventId, eventId).read();
+
+  if (!event) return;
+
+  event.ProgressPercent = Math.max(0, Math.min(100, Math.round(progressPercent)));
+
+  await eventsContainer.items.upsert(event);
+}
+
+
 async function runRebuildAll(eventId, resources) {
   // Mark all participants in this event as processing
   console.log(`Rebuild started for event ${eventId}. Participants: ${resources.length}`);
+
+  await updateEventProgressPercent(eventId, 0);
+
+  const translationProgressEnd = 10;
+  const embeddingsProgressEnd = 20;
+  const matchesProgressStart = embeddingsProgressEnd;
 
   const batchSize = 30;
 
@@ -427,11 +444,13 @@ async function runRebuildAll(eventId, resources) {
   // Translate participant names and job titles once, then save to Cosmos
   console.log("Translation started...");
   await translateMissingParticipantFields(resources, eventId);
+  await updateEventProgressPercent(eventId, translationProgressEnd);
   console.log("Translation completed.");
 
   // Rebuild embeddings for this event
   console.log("Embeddings started...");
   await AllEmbeddings(resources, eventId);
+  await updateEventProgressPercent(eventId, embeddingsProgressEnd);
   console.log("Embeddings completed.");
 
   // Compute matches for each participant, save to cache, and mark as ready
@@ -455,16 +474,22 @@ for (let start = 0; start < resources.length; start += participantBatchSize) {
     })
   );
   console.log(`Matches batch completed: ${batchNumber}/${totalBatches}`);
+  await updateEventProgressPercent(
+  eventId,
+  matchesProgressStart + (batchNumber / totalBatches) * (100 - matchesProgressStart)
+  );
 }
 
   // Update event matching status to completed
   const { resource: event } = await eventsContainer.item(eventId, eventId).read();
 
   if (event) {
-    event.matchingStatus = "completed";
-    event.status = "ready";
-    await eventsContainer.items.upsert(event);
+  event.matchingStatus = "completed";
+  event.ProgressPercent = 100;
+  event.status = "ready";
+  await eventsContainer.items.upsert(event);
   }
+  
   console.log(`Rebuild completed for event ${eventId}.`);
 }
 
