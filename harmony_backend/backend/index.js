@@ -49,6 +49,9 @@ function runFineTuning(eventId) {
 
   const trainingDir = path.join(__dirname, "../ml_service/training");
   const pythonExe = path.join(trainingDir, "venv311", "Scripts", "python.exe");
+  console.log(`Starting Python fine-tuning for event ${eventId}`);
+  console.log(`Training directory: ${trainingDir}`);
+  console.log(`Python executable: ${pythonExe}`);
 
   const pythonProcess = spawn(pythonExe, ["train.py", eventId], {
     cwd: trainingDir,
@@ -75,13 +78,20 @@ function runFineTuning(eventId) {
 
 // Checks whether an event is ready for automatic fine-tuning based on status, trainingStatus, and event date.
 function shouldStartTraining(event) {
-  if (!event) return false;
+  if (!event) {
+    console.log("Skipping event: event is empty");
+    return false;
+  }
 
-  if (event.status !== "ready") return false;
+  if (event.status !== "ready") {
+    console.log(`Skipping event ${event.id}: status is ${event.status}`);
+    return false;
+  }
 
-  if (event.trainingStatus !== "not_ready") return false;
-
-  if (!event.date) return false;
+  if (!event.date) {
+    console.log(`Skipping event ${event.id}: missing date`);
+    return false;
+  }
 
   const eventDate = new Date(event.date);
   const now = new Date();
@@ -89,18 +99,98 @@ function shouldStartTraining(event) {
   const oneDayAfterEvent = new Date(eventDate);
   oneDayAfterEvent.setDate(oneDayAfterEvent.getDate() + 1);
 
-  return now >= oneDayAfterEvent;
+  if (now < oneDayAfterEvent) {
+    console.log(`Skipping event ${event.id}: event date has not passed by one day yet`);
+    return false;
+  }
+
+  if (event.trainingStatus === "not_ready") {
+    console.log(`Event ${event.id} is ready for first training`);
+    return true;
+  }
+
+  if (event.trainingStatus === "failed") {
+    console.log(`Event ${event.id} had failed training before. Retrying`);
+    return true;
+  }
+
+  if (event.trainingStatus === "in_progress") {
+    if (!event.trainingStartedAt) {
+      console.log(`Event ${event.id} is in_progress but missing trainingStartedAt. Retrying`);
+      return true;
+    }
+
+    const startedAt = new Date(event.trainingStartedAt);
+    const hoursPassed = (Date.now() - startedAt.getTime()) / (1000 * 60 * 60);
+
+    if (hoursPassed >= 4) {
+      console.log(`Training for event ${event.id} appears stuck for ${hoursPassed.toFixed(2)} hours. Retrying`);
+      return true;
+    }
+
+    console.log(`Skipping event ${event.id}: training is already in progress`);
+    return false;
+  }
+
+  console.log(`Skipping event ${event.id}: trainingStatus is ${event.trainingStatus}`);
+  return false;
+}
+
+async function eventHasNewTrainingPairs(eventId) {
+  const querySpec = {
+    query: `
+      SELECT * FROM c
+      WHERE c.eventId = @eventId
+      AND IS_DEFINED(c.interactions)
+    `,
+    parameters: [{ name: "@eventId", value: eventId }],
+  };
+
+  const { resources } = await container.items.query(querySpec).fetchAll();
+
+  for (const p of resources) {
+    const interactions = p.interactions || {};
+
+    if ((interactions.saved || []).length > 0) return true;
+    if ((interactions.met || []).length > 0) return true;
+
+    const skipped = interactions.skipped || [];
+    const skippedReasons = interactions.skippedReasons || {};
+
+    for (const skippedId of skipped) {
+      const reason = skippedReasons[String(skippedId)]?.reason;
+      if (reason === "not_relevant") return true;
+    }
+  }
+
+  return false;
 }
 
 // Starts fine-tuning for a single event and updates its training status in Cosmos.
 async function startTrainingForEvent(event) {
   const eventId = event.id;
 
+  const hasNewPairs = await eventHasNewTrainingPairs(eventId);
+
+  if (!hasNewPairs) {
+  event.trainingStatus = "skipped";
+  event.trainingSkippedAt = new Date().toISOString();
+  event.trainingError = "No new training pairs found for this event";
+
+  await eventsContainer.items.upsert(event);
+
+  console.log(`Training skipped for event ${eventId}: no new training pairs`);
+  return;
+}
+  console.log(`Starting training status update for event ${eventId}`);
+
   event.trainingStatus = "in_progress";
   event.trainingStartedAt = new Date().toISOString();
   event.trainingError = null;
 
   await eventsContainer.items.upsert(event);
+  console.log(`Event ${eventId} marked as in_progress`);
+  
 
   try {
     await runFineTuning(eventId);
@@ -109,6 +199,8 @@ async function startTrainingForEvent(event) {
     event.trainingCompletedAt = new Date().toISOString();
 
     await eventsContainer.items.upsert(event);
+    console.log(`Fine-tuning finished successfully for event ${eventId}`);
+   
 
   } catch (err) {
     event.trainingStatus = "failed";
@@ -131,6 +223,8 @@ async function checkEventsForTraining() {
     const { resources: events } = await eventsContainer.items
       .query(querySpec)
       .fetchAll();
+
+    console.log(`Training scheduler checked ${events.length} ready events`);  
 
     for (const event of events) {
       if (shouldStartTraining(event)) {
@@ -327,22 +421,22 @@ const { handleParticipantMatchesOnly } = require("./similarity");
 const { AllEmbeddings } = require("./generateEmbeddings");
 const { translateMissingParticipantFields } = require("./translateParticipants");
 
-app.post("/api/training/admin/test/:eventId", async (req, res) => {
-  try {
-    const eventId = req.params.eventId;
+// app.post("/api/training/admin/test/:eventId", async (req, res) => {
+//   try {
+//     const eventId = req.params.eventId;
 
-    res.status(202).json({
-      message: "Fine-tuning test started",
-      eventId,
-    });
+//     res.status(202).json({
+//       message: "Fine-tuning test started",
+//       eventId,
+//     });
 
-    runFineTuning(eventId).catch((err) => {
-      console.error("Fine-tuning test failed:", err);
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+//     runFineTuning(eventId).catch((err) => {
+//       console.error("Fine-tuning test failed:", err);
+//     });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
 
 // =====================================
