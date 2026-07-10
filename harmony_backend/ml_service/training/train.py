@@ -5,6 +5,7 @@ from sentence_transformers import SentenceTransformer, losses
 from torch.utils.data import DataLoader
 from dotenv import load_dotenv
 from huggingface_hub import login
+from weighted_contrastive_loss import WeightedContrastiveLoss
 
 #train_data, val_data = build_dataset()
 
@@ -21,8 +22,8 @@ train_data, val_data = build_dataset(event_id=event_id)
 old_train = sum(1 for ex in train_data if ex.source == "old")
 new_train = sum(1 for ex in train_data if ex.source == "new")
 
-new_positive_train = sum(1 for ex in train_data if ex.source == "new" and ex.label == 1.0)
-new_negative_train = sum(1 for ex in train_data if ex.source == "new" and ex.label == 0.0)
+new_positive_train = sum(1 for ex in train_data if ex.source == "new" and ex.label == 2.0)
+new_negative_train = sum(1 for ex in train_data if ex.source == "new" and ex.label == -1.0)
 
 old_positive_train = sum(1 for ex in train_data if ex.source == "old" and ex.label == 1.0)
 old_negative_train = sum(1 for ex in train_data if ex.source == "old" and ex.label == 0.0)
@@ -35,6 +36,17 @@ print("Old negative train pairs:", old_negative_train)
 
 print("New positive train pairs:", new_positive_train)
 print("New negative train pairs:", new_negative_train)
+
+new_positive_weight = 1.0
+
+if new_negative_train > 0:
+    new_negative_weight = new_positive_train / new_negative_train
+    new_negative_weight = min(new_negative_weight, 10.0)
+else:
+    new_negative_weight = 1.0
+
+print("New positive weight:", new_positive_weight)
+print("New negative weight:", new_negative_weight)
 
 load_dotenv()
 
@@ -73,7 +85,13 @@ train_dataloader = DataLoader(
     batch_size=16
 )
 
-train_loss = losses.ContrastiveLoss(model=model)
+# train_loss = losses.ContrastiveLoss(model=model)
+train_loss = WeightedContrastiveLoss(
+    model=model,
+    old_weight=1.0,
+    new_positive_weight=new_positive_weight,
+    new_negative_weight=new_negative_weight
+)
 
 model.fit(
     train_objectives=[(train_dataloader, train_loss)],

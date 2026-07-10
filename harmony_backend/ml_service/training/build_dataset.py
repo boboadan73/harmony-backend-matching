@@ -146,9 +146,16 @@ def build_dataset(event_id=None):
 
     for p1, p2, label, source in labels:
         if p1 in participants and p2 in participants:
+            if source == "new" and float(label) == 1.0:
+                encoded_label = 2.0      # new positive
+            elif source == "new" and float(label) == 0.0:
+                encoded_label = -1.0     # new negative
+            else:
+                encoded_label = float(label)  # old positive = 1, old negative = 0
+
             example = InputExample(
-                texts=[participants[p1], participants[p2]],
-                label=float(label)
+               texts=[participants[p1], participants[p2]],
+               label=encoded_label
             )
 
             example.source = source
