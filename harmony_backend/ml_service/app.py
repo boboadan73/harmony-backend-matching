@@ -19,7 +19,7 @@ def get_model():
             if model is None:
                 from sentence_transformers import SentenceTransformer
                 model = SentenceTransformer(
-                    "rayanmahmoud/harmony_model",
+                    "rayanmahmoud/harmony_model_working",
                     token=os.getenv("HF_TOKEN")
                 )
                 print("Model loaded successfully")
