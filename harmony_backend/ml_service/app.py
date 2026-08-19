@@ -20,7 +20,7 @@ def get_model():
                 from sentence_transformers import SentenceTransformer
                 model = SentenceTransformer(
                     "rayanmahmoud/harmony_model_working",
-                    token=os.getenv("HF_TOKEN")
+                    token=os.getenv("HF_WORKING_REPO_ID")
                 )
                 print("Model loaded successfully")
     return model
